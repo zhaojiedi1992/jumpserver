@@ -9,7 +9,6 @@ from ansible.parsing.dataloader import DataLoader
 from ansible.executor.playbook_executor import PlaybookExecutor
 from ansible.playbook.play import Play
 import ansible.constants as C
-from ansible.utils.display import Display
 
 from .callback import AdHocResultCallback, PlaybookResultCallBack, \
     CommandResultCallback
@@ -22,50 +21,62 @@ C.HOST_KEY_CHECKING = False
 logger = get_logger(__name__)
 
 
-class CustomDisplay(Display):
-    def display(self, msg, color=None, stderr=False, screen_only=False, log_only=False):
-        pass
-
-display = CustomDisplay()
-
-
 Options = namedtuple('Options', [
-    'listtags', 'listtasks', 'listhosts', 'syntax', 'connection',
-    'module_path', 'forks', 'remote_user', 'private_key_file', 'timeout',
-    'ssh_common_args', 'ssh_extra_args', 'sftp_extra_args',
-    'scp_extra_args', 'become', 'become_method', 'become_user',
-    'verbosity', 'check', 'extra_vars', 'playbook_path', 'passwords',
-    'diff', 'gathering', 'remote_tmp',
+    'verbosity', 'listhosts', 'subset', 'module_path', 'extra_vars',
+    'forks', 'ask_vault_pass', 'vault_password_files', 'new_vault_password_files',
+    'vault_ids', 'new_vault_id', 'tags', 'skip_tags', 'ask_pass', 'private_key_file',
+    'remote_user', 'connection', 'timeout', 'ssh_common_args', 'sftp_extra_args',
+    'scp_extra_args', 'ssh_extra_args', 'sudo', 'sudo_user', 'su', 'su_user',
+    'become', 'become_method', 'become_user', 'ask_sudo_pass', 'ask_su_pass',
+    'become_ask_pass', 'check', 'syntax', 'diff', 'force_handlers', 'flush_cache',
+    'listtasks', 'listtags', 'step', 'start_at_task', 'passwords',
 ])
 
 
 def get_default_options():
     options = Options(
-        listtags=False,
-        listtasks=False,
-        listhosts=False,
-        syntax=False,
-        timeout=60,
-        connection='ssh',
-        module_path='',
-        forks=10,
-        remote_user='root',
-        private_key_file=None,
-        ssh_common_args="",
-        ssh_extra_args="",
-        sftp_extra_args="",
-        scp_extra_args="",
-        become=None,
-        become_method=None,
-        become_user=None,
-        verbosity=None,
+        verbosity=0,
+        listhosts=None,
+        subset=None,
+        module_path=None,
         extra_vars=[],
+        forks=5,
+        ask_vault_pass=False,
+        vault_password_files=[],
+        new_vault_password_files=[],
+        vault_ids=[],
+        new_vault_id=None,
+        tags=['all'],
+        skip_tags=[],
+        ask_pass=False,
+        private_key_file='',
+        remote_user='root',
+        connection='smart',
+        timeout=10,
+        ssh_common_args='',
+        sftp_extra_args='',
+        scp_extra_args='',
+        ssh_extra_args='',
+        sudo=False,
+        sudo_user=None,
+        su=False,
+        su_user=None,
+        become=False,
+        become_method='sudo',
+        become_user='root',
+        ask_sudo_pass=False,
+        ask_su_pass=False,
+        become_ask_pass=False,
         check=False,
-        playbook_path='/etc/ansible/',
-        passwords=None,
+        syntax=None,
         diff=False,
-        gathering='implicit',
-        remote_tmp='/tmp/.ansible'
+        force_handlers=False,
+        flush_cache=None,
+        listtasks=None,
+        listtags=None,
+        step=None,
+        start_at_task=None,
+        passwords=None,
     )
     return options
 
@@ -135,17 +146,18 @@ class AdHocRunner:
     loader_class = DataLoader
     variable_manager_class = VariableManager
     default_options = get_default_options()
+    options = None
 
     def __init__(self, inventory, options=None):
-        self.options = self.update_options(options)
+        self.options = self.get_options(options)
         self.inventory = inventory
         self.loader = DataLoader()
         self.variable_manager = VariableManager(
             loader=self.loader, inventory=self.inventory
         )
 
-    def get_result_callback(self, file_obj=None):
-        return self.__class__.results_callback_class(file_obj=file_obj)
+    def get_result_callback(self):
+        return self.results_callback_class()
 
     @staticmethod
     def check_module_args(module_name, module_args=''):
@@ -170,24 +182,26 @@ class AdHocRunner:
             cleaned_tasks.append(task)
         return cleaned_tasks
 
+    def get_options(self, options):
+        _options = self.default_options
+        if options and isinstance(options, dict):
+            _options = _options._replace(**options)
+        return _options
+
     def update_options(self, options):
         if options and isinstance(options, dict):
-            options = self.__class__.default_options._replace(**options)
-        else:
-            options = self.__class__.default_options
-        return options
+            self.options = self.options._replace(**options)
 
-    def run(self, tasks, pattern, play_name='Ansible Ad-hoc', gather_facts='no', file_obj=None):
+    def run(self, tasks, pattern, play_name='Ansible Ad-hoc', gather_facts='no'):
         """
         :param tasks: [{'action': {'module': 'shell', 'args': 'ls'}, ...}, ]
         :param pattern: all, *, or others
         :param play_name: The play name
         :param gather_facts:
-        :param file_obj: logging to file_obj
         :return:
         """
         self.check_pattern(pattern)
-        self.results_callback = self.get_result_callback(file_obj)
+        self.results_callback = self.get_result_callback()
         cleaned_tasks = self.clean_tasks(tasks)
 
         play_source = dict(

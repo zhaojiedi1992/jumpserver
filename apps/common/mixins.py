@@ -124,3 +124,4 @@ class AdminUserRequiredMixin(UserPassesTestMixin):
             self.raise_exception = True
             return False
         return True
+

@@ -208,7 +208,7 @@ def test_admin_user_connectability_period():
     for admin_user in admin_users:
         # task_name = _("Test admin user connectability period: {}".format(admin_user.name))
         task_name = _("定期测试管理账号可连接性: {}".format(admin_user.name))
-        test_admin_user_connectability_util(admin_user, task_name)
+        test_admin_user_connectability_util.delay(admin_user, task_name)
 
 
 @shared_task
@@ -311,7 +311,7 @@ def test_system_user_connectability_period():
     for system_user in system_users:
         # task_name = _("Test system user connectability period: {}".format(system_user))
         task_name = _("定期测试系统用户可连接性: {}".format(system_user))
-        test_system_user_connectability_util(system_user, task_name)
+        test_system_user_connectability_util.delay(system_user, task_name)
 
 
 ####  Push system user tasks ####
