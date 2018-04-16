@@ -36,8 +36,7 @@ class AssetUser(models.Model):
 
     @password.setter
     def password(self, password_raw):
-        raise AttributeError("Using set_auth do that")
-        # self._password = signer.sign(password_raw)
+        self._password = signer.sign(password_raw)
 
     @property
     def private_key(self):
@@ -46,8 +45,7 @@ class AssetUser(models.Model):
 
     @private_key.setter
     def private_key(self, private_key_raw):
-        raise AttributeError("Using set_auth do that")
-        # self._private_key = signer.sign(private_key_raw)
+        self._private_key = signer.sign(private_key_raw)
 
     @property
     def private_key_obj(self):
@@ -103,6 +101,19 @@ class AssetUser(models.Model):
         if update_fields:
             self.save(update_fields=update_fields)
 
+    def get_auth(self, asset=None):
+        from .asset import AssetAuthBook
+        if not asset:
+            return self
+        auth = AssetAuthBook.get_asset_auth(asset, self.username)
+        if not auth or auth.date_updated < self.date_updated:
+            return self
+        if auth.password:
+            self.password = auth.password
+        if auth.private_key:
+            self.private_key = auth.private_key
+        return self
+
     def auto_gen_auth(self):
         password = str(uuid.uuid4())
         private_key, public_key = ssh_key_gen(
@@ -124,3 +135,4 @@ class AssetUser(models.Model):
 
     class Meta:
         abstract = True
+        get_latest_by = 'date_updated'

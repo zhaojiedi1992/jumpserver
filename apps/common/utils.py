@@ -19,7 +19,8 @@ import uuid
 
 import paramiko
 import sshpubkeys
-from itsdangerous import TimedJSONWebSignatureSerializer, JSONWebSignatureSerializer, \
+from itsdangerous import TimedJSONWebSignatureSerializer, \
+    JSONWebSignatureSerializer, \
     BadSignature, SignatureExpired
 from django.shortcuts import reverse as dj_reverse
 from django.conf import settings
@@ -76,7 +77,7 @@ class Signer(metaclass=Singleton):
         try:
             return s.loads(value)
         except BadSignature:
-            return {}
+            return None
 
     def sign_t(self, value, expires_in=3600):
         s = TimedJSONWebSignatureSerializer(self.secret_key, expires_in=expires_in)
@@ -87,7 +88,7 @@ class Signer(metaclass=Singleton):
         try:
             return s.loads(value)
         except (BadSignature, SignatureExpired):
-            return {}
+            return None
 
 
 def date_expired_default():

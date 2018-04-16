@@ -51,7 +51,6 @@ def after_app_shutdown(sender=None, headers=None, body=None, **kwargs):
 
 @after_task_publish.connect
 def after_task_publish_signal_handler(sender, headers=None, **kwargs):
-    logger.warn("AFTER TASK PUBLISH SINGAL RECV")
     CeleryTask.objects.create(
         id=headers["id"], status=CeleryTask.WAITING, name=headers["task"]
     )

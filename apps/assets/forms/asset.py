@@ -3,20 +3,27 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from ..models import Asset, AdminUser
+from ..models import Asset, AdminUser, AssetAuthBook
 from common.utils import get_logger
 
 logger = get_logger(__file__)
-__all__ = ['AssetCreateForm', 'AssetUpdateForm', 'AssetBulkUpdateForm']
+__all__ = ['AssetCreateUpdateForm', 'AssetBulkUpdateForm']
 
 
-class AssetCreateForm(forms.ModelForm):
+class AssetCreateUpdateForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput, max_length=128,
+        strip=True, required=False,
+        help_text=_('If password different with this admin user, set it'),
+        label=_("Password individual"),
+    )
+
     class Meta:
         model = Asset
         fields = [
             'hostname', 'ip', 'public_ip', 'port',  'comment',
             'nodes', 'is_active', 'admin_user', 'labels', 'platform',
-            'domain',
+            'domain', 'number'
 
         ]
         widgets = {
@@ -41,53 +48,22 @@ class AssetCreateForm(forms.ModelForm):
             'hostname': '* required',
             'ip': '* required',
             'port': '* required',
-            'admin_user': _(
-                'root or other NOPASSWD sudo privilege user existed in asset,'
-                'If asset is windows or other set any one, more see admin user left menu'
-            ),
+            'admin_user': _('root, Administrator or other manage privilege user existed in asset'),
             'platform': _("* required Must set exact system platform, Windows, Linux ..."),
             'domain': _("If your have some network not connect with each other, you can set domain")
         }
 
-
-class AssetUpdateForm(forms.ModelForm):
-    class Meta:
-        model = Asset
-        fields = [
-            'hostname', 'ip', 'port', 'nodes',  'is_active', 'platform',
-            'public_ip', 'number', 'comment', 'admin_user', 'labels',
-            'domain',
-        ]
-        widgets = {
-            'nodes': forms.SelectMultiple(attrs={
-                'class': 'select2', 'data-placeholder': _('Node')
-            }),
-            'admin_user': forms.Select(attrs={
-                'class': 'select2', 'data-placeholder': _('Admin user')
-            }),
-            'labels': forms.SelectMultiple(attrs={
-                'class': 'select2', 'data-placeholder': _('Label')
-            }),
-            'port': forms.TextInput(),
-            'domain': forms.Select(attrs={
-                'class': 'select2', 'data-placeholder': _('Domain')
-            }),
-        }
-        labels = {
-            'nodes': _("Node"),
-        }
-        help_texts = {
-            'hostname': '* required',
-            'ip': '* required',
-            'port': '* required',
-            'cluster': '* required',
-            'admin_user': _(
-                'root or other NOPASSWD sudo privilege user existed in asset,'
-                'If asset is windows or other set any one, more see admin user left menu'
-            ),
-            'platform': _("* required Must set exact system platform, Windows, Linux ..."),
-            'domain': _("If your have some network not connect with each other, you can set domain")
-        }
+    def save(self, *args, **kwargs):
+        password = self.cleaned_data.pop('password')
+        admin_user = self.cleaned_data.get('admin_user')
+        instance = super().save(*args, **kwargs)
+        if password and admin_user:
+            auth = AssetAuthBook.objects.create(
+                asset=instance, username=admin_user.username
+            )
+            auth.password = password
+            auth.save()
+        return instance
 
 
 class AssetBulkUpdateForm(forms.ModelForm):

@@ -29,13 +29,11 @@
     <div class="hr-line-dashed"></div>
     <h3>{% trans 'Auth' %}</h3>
     {% bootstrap_field form.admin_user layout="horizontal" %}
+    {% bootstrap_field form.password layout="horizontal" %}
 
     <div class="hr-line-dashed"></div>
-    <h3>{% trans 'Node' %}</h3>
+    <h3>{% trans 'Node and labels' %}</h3>
     {% bootstrap_field form.nodes layout="horizontal" %}
-
-    <div class="hr-line-dashed"></div>
-    <h3>{% trans 'Labels' %}</h3>
     <div class="form-group">
         <label for="{{ form.labels.id_for_label }}" class="col-md-2 control-label">{% trans 'Label' %}</label>
         <div class="col-md-9">
@@ -56,11 +54,8 @@
     </div>
 
     <div class="hr-line-dashed"></div>
-    <h3>{% trans 'Configuration' %}</h3>
-    {% bootstrap_field form.number layout="horizontal" %}
-
-    <div class="hr-line-dashed"></div>
     <h3>{% trans 'Other' %}</h3>
+    {% bootstrap_field form.number layout="horizontal" %}
     {% bootstrap_field form.comment layout="horizontal" %}
     {% bootstrap_field form.is_active layout="horizontal" %}
 
@@ -82,9 +77,7 @@
         return group + ':' + item.text;
     }
     $(document).ready(function () {
-        $('.select2').select2({
-            allowClear: true
-        });
+        $('.select2').select2();
         $(".labels").select2({
             allowClear: true,
             templateSelection: format

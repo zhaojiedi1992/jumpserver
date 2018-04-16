@@ -17,6 +17,7 @@ __all__ = [
     'SystemUserCreateView', 'SystemUserUpdateView',
     'SystemUserDetailView', 'SystemUserDeleteView',
     'SystemUserAssetView', 'SystemUserListView',
+    # 'SystemUserPushHistoryView', 'SystemUserSettingView',
 ]
 
 
@@ -97,3 +98,36 @@ class SystemUserAssetView(AdminUserRequiredMixin, DetailView):
         }
         kwargs.update(context)
         return super().get_context_data(**kwargs)
+
+
+# class SystemUserPushHistoryView(AdminUserRequiredMixin, DetailView):
+#     model = SystemUser
+#     template_name = 'assets/system_user_push_history.html'
+#     context_object_name = 'system_user'
+#
+#     def get_context_data(self, **kwargs):
+#         context = {
+#             'app': _('assets'),
+#             'action': _('System user push history'),
+#         }
+#         kwargs.update(context)
+#         return super().get_context_data(**kwargs)
+#
+#
+# class SystemUserSettingView(AdminUserRequiredMixin, SuccessMessageMixin, UpdateView):
+#     model = SystemUser
+#     template_name = 'assets/system_user_setting.html'
+#     context_object_name = 'system_user'
+#     form_class = SystemUserSettingForm
+#     success_message = _("Update system user setting success")
+#
+#     def get_context_data(self, **kwargs):
+#         context = {
+#             'app': _('assets'),
+#             'action': _('System user setting'),
+#         }
+#         kwargs.update(context)
+#         return super().get_context_data(**kwargs)
+#
+#     def get_success_url(self):
+#         return reverse_lazy('assets:system-user-setting', kwargs={'pk': self.object.id})

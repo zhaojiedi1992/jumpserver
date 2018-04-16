@@ -96,6 +96,9 @@ def update_assets_hardware_info_util(assets, task_name=None):
         task_name = _("更新资产硬件信息")
     tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
     hostname_list = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
+    if not hostname_list:
+        logger.info("Not hosts get, may be asset is not active or not unixlike platform")
+        return {}
     task, created = update_or_create_ansible_task(
         task_name, hosts=hostname_list, tasks=tasks, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
@@ -334,12 +337,13 @@ def get_push_system_user_tasks(system_user):
             }
         })
     if system_user.public_key:
+        comment = '{}@fromJumpserverAutoPush'.format(system_user.username)
         tasks.append({
             'name': 'Set {} authorized key'.format(system_user.username),
             'action': {
                 'module': 'authorized_key',
-                'args': "user={} state=present key='{}'".format(
-                    system_user.username, system_user.public_key
+                'args': "user={} state=present key='{}' comment={}".format(
+                    system_user.username, system_user.public_key, comment
                 )
             }
         })

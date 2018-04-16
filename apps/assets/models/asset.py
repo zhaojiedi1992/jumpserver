@@ -4,16 +4,15 @@
 
 import uuid
 import logging
-import random
 
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.core.cache import cache
 
 from ..const import ASSET_ADMIN_CONN_CACHE_KEY
-from .user import AdminUser, SystemUser
+from .base import AssetUser
 
-__all__ = ['Asset']
+__all__ = ['Asset', 'AssetAuthBook']
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +48,7 @@ class Asset(models.Model):
     ip = models.GenericIPAddressField(max_length=32, verbose_name=_('IP'), db_index=True)
     hostname = models.CharField(max_length=128, unique=True, verbose_name=_('Hostname'))
     port = models.IntegerField(default=22, verbose_name=_('Port'))
+    platform = models.CharField(max_length=128, choices=PLATFORM_CHOICES, default='Linux', verbose_name=_('Platform'))
     domain = models.ForeignKey("assets.Domain", null=True, blank=True, related_name='assets', verbose_name=_("Domain"), on_delete=models.SET_NULL)
     nodes = models.ManyToManyField('assets.Node', default=default_node, related_name='assets', verbose_name=_("Nodes"))
     is_active = models.BooleanField(default=True, verbose_name=_('Is active'))
@@ -72,7 +72,6 @@ class Asset(models.Model):
     disk_total = models.CharField(max_length=1024, null=True, blank=True, verbose_name=_('Disk total'))
     disk_info = models.CharField(max_length=1024, null=True, blank=True, verbose_name=_('Disk info'))
 
-    platform = models.CharField(max_length=128, choices=PLATFORM_CHOICES, default='Linux', verbose_name=_('Platform'))
     os = models.CharField(max_length=128, null=True, blank=True, verbose_name=_('OS'))
     os_version = models.CharField(max_length=16, null=True, blank=True, verbose_name=_('OS version'))
     os_arch = models.CharField(max_length=16, blank=True, null=True, verbose_name=_('OS arch'))
@@ -137,13 +136,18 @@ class Asset(models.Model):
         return info
 
     def get_auth_info(self):
-        if self.admin_user:
-            return {
-                'username': self.admin_user.username,
-                'password': self.admin_user.password,
-                'private_key': self.admin_user.private_key_file,
-                'become': self.admin_user.become_info,
-            }
+        info = {}
+        if not self.admin_user:
+            return info
+
+        auth = self.admin_user.get_auth(asset=self)
+        info = {
+            'username': auth.username,
+            'password': auth.password,
+            'private_key': auth.private_key_file,
+            'become': self.admin_user.become_info,
+        }
+        return info
 
     def _to_secret_json(self):
         """
@@ -173,6 +177,7 @@ class Asset(models.Model):
         from random import seed, choice
         import forgery_py
         from django.db import IntegrityError
+        from .user import AdminUser, SystemUser
 
         seed()
         for i in range(count):
@@ -188,3 +193,65 @@ class Asset(models.Model):
             except IntegrityError:
                 print('Error continue')
                 continue
+
+
+class AssetAuthBookQuerySet(models.QuerySet):
+
+    def delete(self):
+        for obj in self:
+            obj.expire_cache()
+        return super().delete()
+
+    def update(self, **kwargs):
+        for obj in self:
+            print("Expire cache")
+            obj.expire_cache()
+        return super().update(**kwargs)
+
+
+class AssetAuthBook(AssetUser):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True)
+    name = models.CharField(max_length=128, blank=True, null=True)
+    asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True)
+
+    CACHE_KEY = '{}_{}_auth'
+    objects = AssetAuthBookQuerySet.as_manager()
+
+    def __str__(self):
+        return '{}-{}'.format(self.asset, self.username)
+
+    @classmethod
+    def get_asset_auth(cls, asset_or_id, username):
+        if isinstance(asset_or_id, Asset):
+            asset_id = asset_or_id.id
+        else:
+            asset_id = asset_or_id
+
+        key = cls.CACHE_KEY.format(asset_id, username)
+        auth_cached = cache.get(key, None)
+        if auth_cached:
+            return auth_cached
+        try:
+            auth = cls.objects.filter(asset=asset_id, username=username).latest()
+            auth.set_cache()
+            return auth
+        except cls.DoesNotExist:
+            return None
+
+    def expire_cache(self):
+        key = self.CACHE_KEY.format(self.asset.id, self.username)
+        cache.delete(key)
+
+    def set_cache(self, expiration=3600):
+        key = self.CACHE_KEY.format(self.asset.id, self.username)
+        cache.set(key, self, expiration)
+
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+        self.expire_cache()
+        return super().save(force_insert=force_insert, force_update=force_update,
+                            using=using, update_fields=update_fields)
+
+    def delete(self, using=None, keep_parents=False):
+        self.expire_cache()
+        return super().delete(using=using, keep_parents=keep_parents)

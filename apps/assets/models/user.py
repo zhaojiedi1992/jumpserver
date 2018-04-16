@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 
-import logging
-import uuid
-
+import json
 from django.core.cache import cache
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
@@ -15,7 +13,6 @@ from .base import AssetUser
 
 
 __all__ = ['AdminUser', 'SystemUser',]
-logger = logging.getLogger(__name__)
 signer = get_signer()
 
 
@@ -86,7 +83,7 @@ class AdminUser(AssetUser):
                       created_by='Fake')
             try:
                 obj.save()
-                logger.debug('Generate fake asset group: %s' % obj.name)
+                print('Generate fake asset group: %s' % obj.name)
             except IntegrityError:
                 print('Error continue')
                 continue
@@ -126,6 +123,21 @@ class SystemUser(AssetUser):
         return assets
 
     @property
+    def cleaned_setting(self):
+        try:
+            return json.loads(self.setting)
+        except json.JSONDecodeError:
+            return None
+
+    @cleaned_setting.setter
+    def cleaned_setting(self, item):
+        try:
+            v = json.dumps(item)
+            self.setting = v
+        except json.JSONDecodeError as e:
+            raise ValueError("Json dump error: {}".format(str(e)))
+
+    @property
     def assets_connective(self):
         _result = cache.get(SYSTEM_USER_CONN_CACHE_KEY.format(self.name), {})
         return _result
@@ -163,7 +175,7 @@ class SystemUser(AssetUser):
                       created_by='Fake')
             try:
                 obj.save()
-                logger.debug('Generate fake asset group: %s' % obj.name)
+                print('Generate fake asset group: %s' % obj.name)
             except IntegrityError:
                 print('Error continue')
                 continue
