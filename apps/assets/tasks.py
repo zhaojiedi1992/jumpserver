@@ -9,9 +9,6 @@ from django.utils.translation import ugettext as _
 
 from common.utils import get_object_or_none, capacity_convert, \
     sum_capacity, encrypt_password, get_logger
-from ops.celery.utils import register_as_period_task, after_app_shutdown_clean, \
-    after_app_ready_start
-from ops.celery import app as celery_app
 
 from .models import SystemUser, AdminUser, Asset
 from . import const
@@ -117,10 +114,6 @@ def update_asset_hardware_info_manual(asset):
     return update_assets_hardware_info_util([asset], task_name=task_name)
 
 
-@celery_app.task
-@register_as_period_task(interval=3600)
-@after_app_ready_start
-@after_app_shutdown_clean
 def update_assets_hardware_info_period():
     """
     Update asset hardware period task
@@ -195,10 +188,6 @@ def test_admin_user_connectability_util(admin_user, task_name):
     return result
 
 
-@celery_app.task
-@register_as_period_task(interval=3600)
-@after_app_ready_start
-@after_app_shutdown_clean
 def test_admin_user_connectability_period():
     """
     A period task that update the ansible task period
@@ -301,10 +290,6 @@ def test_system_user_connectability_manual(system_user):
     return test_system_user_connectability_util(system_user, task_name)
 
 
-@shared_task
-@register_as_period_task(interval=3600)
-@after_app_ready_start
-@after_app_shutdown_clean
 def test_system_user_connectability_period():
     if PERIOD_TASK != "on":
         logger.debug("Period task disabled, test system user connectability pass")

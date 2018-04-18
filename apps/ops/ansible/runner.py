@@ -29,7 +29,7 @@ Options = namedtuple('Options', [
     'scp_extra_args', 'ssh_extra_args', 'sudo', 'sudo_user', 'su', 'su_user',
     'become', 'become_method', 'become_user', 'ask_sudo_pass', 'ask_su_pass',
     'become_ask_pass', 'check', 'syntax', 'diff', 'force_handlers', 'flush_cache',
-    'listtasks', 'listtags', 'step', 'start_at_task', 'passwords',
+    'listtasks', 'listtags', 'step', 'start_at_task', 'passwords', 'host_key_checking'
 ])
 
 
@@ -77,6 +77,7 @@ def get_default_options():
         step=None,
         start_at_task=None,
         passwords=None,
+        host_key_checking=False,
     )
     return options
 
@@ -230,7 +231,9 @@ class AdHocRunner:
         ))
 
         try:
+            print("Start run")
             tqm.run(play)
+            print("Run end")
             return self.results_callback
         except Exception as e:
             raise AnsibleError(e)

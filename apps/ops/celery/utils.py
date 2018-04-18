@@ -7,6 +7,13 @@ from django.db.utils import ProgrammingError, OperationalError
 from django.core.cache import cache
 from django_celery_beat.models import PeriodicTask, IntervalSchedule, CrontabSchedule
 
+INTERVAL_UNIT_MAP = {
+    's': IntervalSchedule.SECONDS,
+    'm': IntervalSchedule.MINUTES,
+    'h': IntervalSchedule.HOURS,
+    'd': IntervalSchedule.DAYS,
+}
+
 
 def add_register_period_task(name):
     key = "__REGISTER_PERIODIC_TASKS"
@@ -67,7 +74,8 @@ def create_or_update_celery_periodic_tasks(tasks):
         except (ProgrammingError, OperationalError):
             return None
 
-        if isinstance(detail.get("interval"), int):
+        _interval = detail.get("interval")
+        if isinstance(_interval, int):
             intervals = IntervalSchedule.objects.filter(
                 every=detail["interval"], period=IntervalSchedule.SECONDS
             )
@@ -77,6 +85,21 @@ def create_or_update_celery_periodic_tasks(tasks):
                 interval = IntervalSchedule.objects.create(
                     every=detail['interval'],
                     period=IntervalSchedule.SECONDS,
+                )
+        elif isinstance(_interval, str) and _interval[-1].isdigit():
+            val = int(_interval[:-1])
+            unit = INTERVAL_UNIT_MAP.get(_interval[-1].lower())
+            if not unit:
+                raise SyntaxError("Schedule is not valid: {}".format(_interval))
+            intervals = IntervalSchedule.objects.filter(
+                every=val, period=unit
+            )
+            if intervals:
+                interval = intervals[0]
+            else:
+                interval = IntervalSchedule.objects.create(
+                    every=val,
+                    period=unit,
                 )
         elif isinstance(detail.get("crontab"), str):
             try:

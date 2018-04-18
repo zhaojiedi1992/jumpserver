@@ -12,7 +12,7 @@ class AdHocResultCallback(CallbackModule):
     """
     Task result Callback
     """
-    def __init__(self, display=None, options=None, file_obj=None):
+    def __init__(self):
         # result_raw example: {
         #   "ok": {"hostname": {"task_name": {}，...},..},
         #   "failed": {"hostname": {"task_name": {}..}, ..},

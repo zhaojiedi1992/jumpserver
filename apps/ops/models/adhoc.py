@@ -20,14 +20,14 @@ from ..celery.utils import delete_celery_periodic_task, \
 from ..ansible import AdHocRunner, AnsibleError
 from ..inventory import JMSInventory
 
-__all__ = ["Task", "AdHoc", "AdHocRunHistory"]
+__all__ = ["AnsibleTask", "AdHoc", "AdHocRunHistory"]
 
 
 logger = get_logger(__file__)
 signer = get_signer()
 
 
-class Task(models.Model):
+class AnsibleTask(models.Model):
     """
     This task is different ansible task, Task like 'push system user', 'get asset info' ..
     One task can have some versions of adhoc, run a task only run the latest version adhoc
@@ -82,9 +82,9 @@ class Task(models.Model):
     def get_run_history(self):
         return self.history.all()
 
-    def run(self, record=True):
+    def run(self, *args, **kwargs):
         if self.latest_adhoc:
-            return self.latest_adhoc.run(record=record)
+            return self.latest_adhoc.run()
         else:
             return {'error': 'No adhoc'}
 
@@ -97,19 +97,11 @@ class Task(models.Model):
         )
 
         if self.is_periodic:
-            interval = None
-            crontab = None
-
-            if self.interval:
-                interval = self.interval
-            elif self.crontab:
-                crontab = self.crontab
-
             tasks = {
                 self.name: {
                     "task": run_ansible_task.name,
-                    "interval": interval,
-                    "crontab": crontab,
+                    "interval": self.interval or None,
+                    "crontab": self.crontab or None,
                     "args": (str(self.id),),
                     "kwargs": {"callback": self.callback},
                     "enabled": True,
@@ -143,66 +135,63 @@ class AdHoc(models.Model):
     task: A task reference
     _tasks: [{'name': 'task_name', 'action': {'module': '', 'args': ''}, 'other..': ''}, ]
     _options: ansible options, more see ops.ansible.runner.Options
-    _hosts: ["hostname1", "hostname2"], hostname must be unique key of cmdb
+    assets:
+    nodes:
     run_as_admin: if true, then need get every host admin user run it, because every host may be have different admin user, so we choise host level
     run_as: if not run as admin, it run it as a system/common user from cmdb
     _become: May be using become [sudo, su] options. {method: "sudo", user: "user", pass: "pass"]
     pattern: Even if we set _hosts, We only use that to make inventory, We also can set `patter` to run task on match hosts
     """
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
-    task = models.ForeignKey(Task, related_name='adhoc', on_delete=models.CASCADE)
+    assets = models.ManyToManyField('assets.Asset', blank=True, verbose_name=_("Asset"))  # ['hostname1', 'hostname2']
+    nodes = models.ManyToManyField('assets.Node', blank=True, verbose_name=_("Node"))
+    task = models.ForeignKey(AnsibleTask, related_name='adhoc', on_delete=models.CASCADE)
     _tasks = models.TextField(verbose_name=_('Tasks'))
-    pattern = models.CharField(max_length=64, default='{}', verbose_name=_('Pattern'))
-    _options = models.CharField(max_length=1024, default='', verbose_name=_('Options'))
-    _hosts = models.TextField(blank=True, verbose_name=_('Hosts'))  # ['hostname1', 'hostname2']
+    _vars = models.TextField(verbose_name=_('Vars'), default='{}', blank=True, null=True)
+    pattern = models.CharField(max_length=1024, default='', verbose_name=_('Pattern'))
+    _options = models.CharField(max_length=1024, default='{}', verbose_name=_('Options'))
     run_as_admin = models.BooleanField(default=False, verbose_name=_('Run as admin'))
     run_as = models.CharField(max_length=128, default='', verbose_name=_("Run as"))
-    _become = models.CharField(max_length=1024, default='', verbose_name=_("Become"))
+    _become = models.CharField(max_length=1024, default='{}', verbose_name=_("Become"))
     created_by = models.CharField(max_length=64, default='', null=True, verbose_name=_('Create by'))
     date_created = models.DateTimeField(auto_now_add=True)
 
+    @staticmethod
+    def json_decode(data):
+        try:
+            return json.loads(data)
+        except (TypeError, json.JSONDecodeError):
+            return None
+
+    @staticmethod
+    def json_encode(data, t=dict):
+        if not isinstance(data, t):
+            raise TypeError("Not a {} instance: {}".format(t.__name__, data))
+        return json.dumps(data)
+
     @property
     def tasks(self):
-        return json.loads(self._tasks)
+        return self.json_decode(self._tasks) or []
 
     @tasks.setter
     def tasks(self, item):
-        if item and isinstance(item, list):
-            self._tasks = json.dumps(item)
-        else:
-            raise SyntaxError('Tasks should be a list: {}'.format(item))
+        self._tasks = self.json_encode(item, t=list)
 
     @property
-    def hosts(self):
-        return json.loads(self._hosts)
+    def vars(self):
+        return self.json_decode(self._vars) or {}
 
-    @hosts.setter
-    def hosts(self, item):
-        self._hosts = json.dumps(item)
+    @vars.setter
+    def vars(self, item):
+        self._vars = self.json_encode(item)
 
     @property
     def inventory(self):
-        if self.become:
-            become_info = {
-                'become': {
-                    self.become
-                }
-            }
-        else:
-            become_info = None
-
         inventory = JMSInventory(
-            self.hosts, run_as_admin=self.run_as_admin,
-            run_as=self.run_as, become_info=become_info
+            self.assets.all(), nodes=self.nodes.all(), run_as_admin=self.run_as_admin,
+            run_as=self.run_as, become_info=self.become, vars=self.vars,
         )
         return inventory
-
-    @property
-    def become(self):
-        if self._become:
-            return json.loads(signer.unsign(self._become))
-        else:
-            return {}
 
     def run(self, record=True):
         if record:
@@ -234,7 +223,6 @@ class AdHoc(models.Model):
         except IndexError as e:
             return {}, {"dark": {"all": str(e)}, "contacted": []}
         finally:
-            # f.close()
             history.date_finished = timezone.now()
             history.timedelta = time.time() - time_start
             history.save()
@@ -249,8 +237,15 @@ class AdHoc(models.Model):
             )
             return result.results_raw, result.results_summary
         except AnsibleError as e:
-            logger.warn("Failed run adhoc {}, {}".format(self.task.name, e))
-            pass
+            return {'error': str(e)}
+
+    @property
+    def become(self):
+        info = self.json_decode(self._become)
+        if not info:
+            return None
+        else:
+            return {'become': info}
 
     @become.setter
     def become(self, item):
@@ -266,15 +261,11 @@ class AdHoc(models.Model):
 
     @property
     def options(self):
-        if self._options:
-            _options = json.loads(self._options)
-            if isinstance(_options, dict):
-                return _options
-        return {}
+        return self.json_decode(self._options) or {}
 
     @options.setter
     def options(self, item):
-        self._options = json.dumps(item)
+        self._options = self.json_encode(item)
 
     @property
     def short_id(self):
@@ -286,11 +277,6 @@ class AdHoc(models.Model):
             return self.history.all().latest()
         except AdHocRunHistory.DoesNotExist:
             return None
-
-    def save(self, force_insert=False, force_update=False, using=None,
-             update_fields=None):
-        super().save(force_insert=force_insert, force_update=force_update,
-                     using=using, update_fields=update_fields)
 
     def __str__(self):
         return "{} of {}".format(self.task.name, self.short_id)
@@ -317,7 +303,7 @@ class AdHocRunHistory(models.Model):
     AdHoc running history.
     """
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
-    task = models.ForeignKey(Task, related_name='history', on_delete=models.SET_NULL, null=True)
+    task = models.ForeignKey(AnsibleTask, related_name='history', on_delete=models.SET_NULL, null=True)
     adhoc = models.ForeignKey(AdHoc, related_name='history', on_delete=models.SET_NULL, null=True)
     date_start = models.DateTimeField(auto_now_add=True, verbose_name=_('Start time'))
     date_finished = models.DateTimeField(blank=True, null=True, verbose_name=_('End time'))

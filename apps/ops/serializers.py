@@ -2,12 +2,12 @@
 from __future__ import unicode_literals
 from rest_framework import serializers
 
-from .models import Task, AdHoc, AdHocRunHistory
+from .models import AnsibleTask, AdHoc, AdHocRunHistory
 
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Task
+        model = AnsibleTask
         fields = '__all__'
 
 

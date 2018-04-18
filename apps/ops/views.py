@@ -5,13 +5,13 @@ from django.conf import settings
 from django.views.generic import ListView, DetailView, TemplateView
 
 from common.mixins import DatetimeSearchMixin
-from .models import Task, AdHoc, AdHocRunHistory, CeleryTask
+from .models import AnsibleTask, AdHoc, AdHocRunHistory, CeleryTask
 from .hands import AdminUserRequiredMixin
 
 
 class TaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
     paginate_by = settings.DISPLAY_PER_PAGE
-    model = Task
+    model = AnsibleTask
     ordering = ('-date_created',)
     context_object_name = 'task_list'
     template_name = 'ops/task_list.html'
@@ -44,7 +44,7 @@ class TaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
 
 
 class TaskDetailView(AdminUserRequiredMixin, DetailView):
-    model = Task
+    model = AnsibleTask
     template_name = 'ops/task_detail.html'
 
     def get_context_data(self, **kwargs):
@@ -57,7 +57,7 @@ class TaskDetailView(AdminUserRequiredMixin, DetailView):
 
 
 class TaskAdhocView(AdminUserRequiredMixin, DetailView):
-    model = Task
+    model = AnsibleTask
     template_name = 'ops/task_adhoc.html'
 
     def get_context_data(self, **kwargs):
@@ -70,7 +70,7 @@ class TaskAdhocView(AdminUserRequiredMixin, DetailView):
 
 
 class TaskHistoryView(AdminUserRequiredMixin, DetailView):
-    model = Task
+    model = AnsibleTask
     template_name = 'ops/task_history.html'
 
     def get_context_data(self, **kwargs):

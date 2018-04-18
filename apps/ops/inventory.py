@@ -14,37 +14,55 @@ class JMSInventory(BaseInventory):
     JMS Inventory is the manager with jumpserver assets, so you can
     write you own manager, construct you inventory
     """
-    def __init__(self, hostname_list, run_as_admin=False, run_as=None, become_info=None):
+    def __init__(self, assets, nodes=None, run_as_admin=False,
+                 run_as=None, become_info=None, vars=None):
         """
-        :param hostname_list: ["test1", ]
+        :param assets: ["uuid1", ]
         :param run_as_admin: True 是否使用管理用户去执行, 每台服务器的管理用户可能不同
         :param run_as: 是否统一使用某个系统用户去执行
         :param become_info: 是否become成某个用户去执行
         """
-        self.hostname_list = hostname_list
+        self.assets = assets or []
+        self.nodes = nodes or []
         self.using_admin = run_as_admin
         self.run_as = run_as
         self.become_info = become_info
+        self.vars = vars or {}
+        hosts, groups = self.parse_resource()
+        super().__init__(host_list=hosts, group_list=groups)
 
-        assets = self.get_jms_assets()
-        host_list = []
+    def parse_resource(self):
+        assets = self.get_all_assets()
+        hosts = []
+        nodes = set()
+        groups = []
 
         for asset in assets:
-            info = self.convert_to_ansible(asset, run_as_admin=run_as_admin)
-            host_list.append(info)
+            info = self.convert_to_ansible(asset, run_as_admin=self.using_admin)
+            hosts.append(info)
+            nodes.update(set(asset.nodes.all()))
 
-        if run_as:
+        if self.run_as:
             run_user_info = self.get_run_user_info()
-            for host in host_list:
+            for host in hosts:
                 host.update(run_user_info)
 
-        if become_info:
-            for host in host_list:
-                host.update(become_info)
-        super().__init__(host_list=host_list)
+        if self.become_info:
+            for host in hosts:
+                host.update(self.become_info)
 
-    def get_jms_assets(self):
-        assets = get_assets_by_hostname_list(self.hostname_list)
+        for node in nodes:
+            groups.append({
+                'name': node.value,
+                'children': [n.value for n in node.get_children()]
+            })
+        return hosts, groups
+
+    def get_all_assets(self):
+        assets = set(self.assets)
+        for node in self.nodes:
+            _assets = set(node.get_all_assets())
+            assets.update(_assets)
         return assets
 
     def convert_to_ansible(self, asset, run_as_admin=False):
@@ -72,6 +90,16 @@ class JMSInventory(BaseInventory):
                 "domain": asset.domain.name,
             })
             info["groups"].append("domain_"+asset.domain.name)
+        for k, v in self.vars.items():
+            if not k.startswith('__'):
+                info['vars'].update({
+                    k: v
+                })
+        host_vars = self.vars.get("__{}".format(asset.id), {})
+        for k, v in host_vars.items():
+            info['vars'].update({
+                k: v
+            })
         return info
 
     def get_run_user_info(self):
