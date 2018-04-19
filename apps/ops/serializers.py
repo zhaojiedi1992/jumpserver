@@ -12,13 +12,19 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class AdHocSerializer(serializers.ModelSerializer):
+    total_assets_count = serializers.SerializerMethodField()
+
     class Meta:
         model = AdHoc
-        exclude = ('_tasks', '_options', '_hosts', '_become')
+        fields = '__all__'
+
+    @staticmethod
+    def get_total_assets_count(obj):
+        return obj.total_assets_count
 
     def get_field_names(self, declared_fields, info):
         fields = super().get_field_names(declared_fields, info)
-        fields.extend(['tasks', 'options', 'hosts', 'become', 'short_id'])
+        fields.extend(['short_id'])
         return fields
 
 
@@ -29,7 +35,7 @@ class AdHocRunHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AdHocRunHistory
-        exclude = ('_result', '_summary')
+        exclude = ('result', 'summary')
 
     @staticmethod
     def get_adhoc_short_id(obj):
@@ -42,9 +48,9 @@ class AdHocRunHistorySerializer(serializers.ModelSerializer):
     @staticmethod
     def get_stat(obj):
         return {
-            "total": len(obj.adhoc.hosts),
-            "success": len(obj.summary.get("contacted", [])),
-            "failed": len(obj.summary.get("dark", [])),
+            "total": len(obj.adhoc.total_assets),
+            "success": len(obj.summary.get("contacted", [])) if obj.summary else 0,
+            "failed": len(obj.summary.get("dark", [])) if obj.summary else 0,
         }
 
     def get_field_names(self, declared_fields, info):

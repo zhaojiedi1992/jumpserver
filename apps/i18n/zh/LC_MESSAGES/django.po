@@ -1635,7 +1635,7 @@ msgstr "任务详情"
 #: ops/templates/ops/task_adhoc.html:22 ops/templates/ops/task_detail.html:22
 #: ops/templates/ops/task_history.html:22 ops/views.py:66
 msgid "Task versions"
-msgstr "任务各版本"
+msgstr "任务版本"
 
 #: ops/templates/ops/task_adhoc.html:25 ops/templates/ops/task_detail.html:25
 #: ops/templates/ops/task_history.html:25

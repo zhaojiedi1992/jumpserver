@@ -1,18 +1,16 @@
 # ~*~ coding: utf-8 ~*~
 
-import sys
 
 from ansible.plugins.callback import CallbackBase
 from ansible.plugins.callback.default import CallbackModule
-
-from .display import TeeObj
+from .display import LogFileDisplay
 
 
 class AdHocResultCallback(CallbackModule):
     """
     Task result Callback
     """
-    def __init__(self):
+    def __init__(self, log_f=None):
         # result_raw example: {
         #   "ok": {"hostname": {"task_name": {}，...},..},
         #   "failed": {"hostname": {"task_name": {}..}, ..},
@@ -25,9 +23,9 @@ class AdHocResultCallback(CallbackModule):
         # }
         self.results_raw = dict(ok={}, failed={}, unreachable={}, skipped={})
         self.results_summary = dict(contacted=[], dark={})
+        f = open('/tmp/123.log', 'w')
         super().__init__()
-        if file_obj is not None:
-            sys.stdout = TeeObj(file_obj)
+        self._display = LogFileDisplay(f)
 
     def gather_result(self, t, res):
         self._clean_results(res._result, res._task.action)

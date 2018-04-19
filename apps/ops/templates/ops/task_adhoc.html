@@ -56,10 +56,10 @@
                                                     <input type="checkbox" id="check_all" class="ipt_check_all" >
                                                 </th>
                                                 <th>{% trans 'Version' %}</th>
-                                                <th>{% trans 'Hosts' %}</th>
+                                                <th>{% trans 'Asset' %}</th>
+                                                <th>{% trans 'Node' %}</th>
                                                 <th>{% trans 'Pattern' %}</th>
                                                 <th>{% trans 'Run as' %}</th>
-                                                <th>{% trans 'Become' %}</th>
                                                 <th>{% trans 'Datetime' %}</th>
                                                 <th>{% trans 'Action' %}</th>
                                             </tr>
@@ -90,22 +90,15 @@
 {#                        var detail_btn = '<a href="' + cellData + '</a>';#}
                         $(td).html(cellData);
                      }},
-                    {targets: 2, createdCell: function (td, cellData, rowData) {
+                    {targets: 3, createdCell: function (td, cellData, rowData) {
                         var dataLength = cellData.length;
                         $(td).html(dataLength);
                     }},
-                    {targets: 4, createdCell: function (td, cellData) {
+                    {targets: 5, createdCell: function (td, cellData) {
                         if (!cellData) {
                             $(td).html("Admin")
                         } else {
                             $(td).html(cellData)
-                        }
-                    }},
-                    {targets: 5, createdCell: function (td, cellData, rowData) {
-                        if (!cellData) {
-                            $(td).html("")
-                        } else {
-                            $(td).html(cellData.user)
                         }
                     }},
                     {targets: 6, createdCell: function (td, cellData) {
@@ -120,8 +113,11 @@
                     }}
                 ],
                 ajax_url: '{% url "api-ops:adhoc-list" %}?task={{ object.pk }}',
-                columns: [{data: function(){return ""}}, {data: "short_id" }, {data: "hosts"}, {data: "pattern"},
-                          {data: "run_as"}, {data: "become"}, {data: "date_created"}, {data: "id"}]
+                columns: [
+                    {data: function(){return ""}}, {data: "short_id" }, {data: "total_assets_count"},
+                    {data: 'nodes'}, {data: "pattern"}, {data: "run_as"},
+                    {data: "date_created"}, {data: "id"}
+                ]
             };
             jumpserver.initDataTable(options);
         })

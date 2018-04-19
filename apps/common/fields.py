@@ -2,6 +2,7 @@
 #
 import json
 
+from django.core import checks
 from django.db import models
 from django import forms
 from django.utils import six
@@ -55,9 +56,9 @@ class StringManyToManyField(serializers.RelatedField):
 
 class EncryptMixin:
     def from_db_value(self, value, expression, connection, context):
-        if value is not None:
-            return signer.unsign(value)
-        return super().from_db_value(self, value, expression, connection, context)
+        if value is None:
+            return value
+        return signer.unsign(value)
 
     def get_prep_value(self, value):
         if value is None:
@@ -73,4 +74,44 @@ class EncryptCharField(EncryptMixin, models.CharField):
     def __init__(self, *args, **kwargs):
         kwargs['max_length'] = 2048
         super().__init__(*args, **kwargs)
+
+
+class JsonMixin:
+    @staticmethod
+    def json_decode(data):
+        try:
+            return json.loads(data)
+        except (TypeError, json.JSONDecodeError):
+            return None
+
+    @staticmethod
+    def json_encode(data):
+        return json.dumps(data)
+
+    def from_db_value(self, value, expression, connection, context):
+        if value is None:
+            return value
+        return self.json_decode(value)
+
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if not isinstance(value, str) or not value.startswith(':'):
+            return value
+        else:
+            return self.json_decode(value)
+
+    def get_prep_value(self, value):
+        if value is None:
+            return value
+        return self.json_encode(value)
+
+
+class JsonCharField(JsonMixin, models.CharField):
+    description = _("Marshal data to char field")
+
+
+class JsonTextField(JsonMixin, models.TextField):
+    description = _("Marshal data to text field")
 

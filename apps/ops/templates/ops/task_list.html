@@ -50,8 +50,8 @@
             <td class="text-center">
                 <span class="text-danger">{{ object.history_summary.failed }}</span>/<span class="text-navy">{{ object.history_summary.success}}</span>/{{ object.history_summary.total}}
             </td>
-            <td class="text-center">{{ object.adhoc.all | length}}</td>
-            <td class="text-center">{{ object.latest_adhoc.hosts | length}}</td>
+            <td class="text-center">{{ object.adhoc.all.count }}</td>
+            <td class="text-center">{{ object.latest_adhoc.total_assets_count }}</td>
             <td class="text-center">
             {% if object.latest_history %}
                 {% if object.latest_history.is_success %}

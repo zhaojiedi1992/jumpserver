@@ -231,9 +231,7 @@ class AdHocRunner:
         ))
 
         try:
-            print("Start run")
             tqm.run(play)
-            print("Run end")
             return self.results_callback
         except Exception as e:
             raise AnsibleError(e)

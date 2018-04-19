@@ -13,11 +13,12 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django_celery_beat.models import PeriodicTask
 
+from common.fields import JsonCharField, JsonTextField
 from common.utils import get_signer, get_logger
 from ..celery.utils import delete_celery_periodic_task, \
     create_or_update_celery_periodic_tasks, \
     disable_celery_periodic_task
-from ..ansible import AdHocRunner, AnsibleError
+from ..ansible import AdHocRunner
 from ..inventory import JMSInventory
 
 __all__ = ["AnsibleTask", "AdHoc", "AdHocRunHistory"]
@@ -37,7 +38,6 @@ class AnsibleTask(models.Model):
     interval = models.IntegerField(verbose_name=_("Interval"), null=True, blank=True, help_text=_("Units: seconds"))
     crontab = models.CharField(verbose_name=_("Crontab"), null=True, blank=True, max_length=128, help_text=_("5 * * * *"))
     is_periodic = models.BooleanField(default=False)
-    callback = models.CharField(max_length=128, blank=True, null=True, verbose_name=_("Callback"))  # Callback must be a registered celery task
     is_deleted = models.BooleanField(default=False)
     comment = models.TextField(blank=True, verbose_name=_("Comment"))
     created_by = models.CharField(max_length=128, blank=True, null=True, default='')
@@ -82,7 +82,7 @@ class AnsibleTask(models.Model):
     def get_run_history(self):
         return self.history.all()
 
-    def run(self, *args, **kwargs):
+    def run(self):
         if self.latest_adhoc:
             return self.latest_adhoc.run()
         else:
@@ -103,7 +103,6 @@ class AnsibleTask(models.Model):
                     "interval": self.interval or None,
                     "crontab": self.crontab or None,
                     "args": (str(self.id),),
-                    "kwargs": {"callback": self.callback},
                     "enabled": True,
                 }
             }
@@ -123,75 +122,57 @@ class AnsibleTask(models.Model):
             return None
 
     def __str__(self):
-        return self.name
+        return '{}:{}'.format(self.name, self.id)
 
     class Meta:
-        db_table = 'ops_task'
         get_latest_by = 'date_created'
 
 
 class AdHoc(models.Model):
     """
     task: A task reference
-    _tasks: [{'name': 'task_name', 'action': {'module': '', 'args': ''}, 'other..': ''}, ]
-    _options: ansible options, more see ops.ansible.runner.Options
+    actions: [{'name': 'task_name', 'action': {'module': '', 'args': ''}, 'other..': ''}, ]
+    options: ansible options, more see ops.ansible.runner.Options
     assets:
     nodes:
     run_as_admin: if true, then need get every host admin user run it, because every host may be have different admin user, so we choise host level
     run_as: if not run as admin, it run it as a system/common user from cmdb
-    _become: May be using become [sudo, su] options. {method: "sudo", user: "user", pass: "pass"]
+    become: May be using become [sudo, su] options. {method: "sudo", user: "user", pass: "pass"]
     pattern: Even if we set _hosts, We only use that to make inventory, We also can set `patter` to run task on match hosts
     """
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     assets = models.ManyToManyField('assets.Asset', blank=True, verbose_name=_("Asset"))  # ['hostname1', 'hostname2']
     nodes = models.ManyToManyField('assets.Node', blank=True, verbose_name=_("Node"))
     task = models.ForeignKey(AnsibleTask, related_name='adhoc', on_delete=models.CASCADE)
-    _tasks = models.TextField(verbose_name=_('Tasks'))
-    _vars = models.TextField(verbose_name=_('Vars'), default='{}', blank=True, null=True)
-    pattern = models.CharField(max_length=1024, default='', verbose_name=_('Pattern'))
-    _options = models.CharField(max_length=1024, default='{}', verbose_name=_('Options'))
-    run_as_admin = models.BooleanField(default=False, verbose_name=_('Run as admin'))
+    actions = JsonTextField(verbose_name=_('Actions'))
+    vars = JsonTextField(verbose_name=_('Vars'), default={}, blank=True, null=True)
+    pattern = models.CharField(max_length=1024, default='all', verbose_name=_('Pattern'))
+    options = JsonCharField(max_length=1024, verbose_name=_('Options'))
+    run_as_admin = models.BooleanField(default=True, verbose_name=_('Run as admin'))
     run_as = models.CharField(max_length=128, default='', verbose_name=_("Run as"))
-    _become = models.CharField(max_length=1024, default='{}', verbose_name=_("Become"))
+    become = JsonCharField(max_length=1024, default={}, verbose_name=_("Become"))
     created_by = models.CharField(max_length=64, default='', null=True, verbose_name=_('Create by'))
     date_created = models.DateTimeField(auto_now_add=True)
 
-    @staticmethod
-    def json_decode(data):
-        try:
-            return json.loads(data)
-        except (TypeError, json.JSONDecodeError):
-            return None
-
-    @staticmethod
-    def json_encode(data, t=dict):
-        if not isinstance(data, t):
-            raise TypeError("Not a {} instance: {}".format(t.__name__, data))
-        return json.dumps(data)
-
-    @property
-    def tasks(self):
-        return self.json_decode(self._tasks) or []
-
-    @tasks.setter
-    def tasks(self, item):
-        self._tasks = self.json_encode(item, t=list)
-
-    @property
-    def vars(self):
-        return self.json_decode(self._vars) or {}
-
-    @vars.setter
-    def vars(self, item):
-        self._vars = self.json_encode(item)
-
     @property
     def inventory(self):
+        become_info = {'become': self.become} if self.become else None
         inventory = JMSInventory(
             self.assets.all(), nodes=self.nodes.all(), run_as_admin=self.run_as_admin,
-            run_as=self.run_as, become_info=self.become, vars=self.vars,
+            run_as=self.run_as, become_info=become_info, vars=self.vars,
         )
         return inventory
+
+    @property
+    def total_assets(self):
+        assets = set(self.assets.all())
+        for node in self.nodes.all():
+            assets.update(set(node.get_all_assets()))
+        return assets
+
+    @property
+    def total_assets_count(self):
+        return len(self.total_assets)
 
     def run(self, record=True):
         if record:
@@ -208,6 +189,8 @@ class AdHoc(models.Model):
         time_start = time.time()
         try:
             date_start = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(date_start)
+            print(self.task.name)
             print("{} Start task: {}\r\n".format(date_start, self.task.name))
             raw, summary = self._run_only()
             date_end = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -230,42 +213,10 @@ class AdHoc(models.Model):
     def _run_only(self):
         runner = AdHocRunner(self.inventory, options=self.options)
         try:
-            result = runner.run(
-                self.tasks,
-                self.pattern,
-                self.task.name,
-            )
+            result = runner.run(self.actions, self.pattern, self.task.name)
             return result.results_raw, result.results_summary
-        except AnsibleError as e:
-            return {'error': str(e)}
-
-    @property
-    def become(self):
-        info = self.json_decode(self._become)
-        if not info:
-            return None
-        else:
-            return {'become': info}
-
-    @become.setter
-    def become(self, item):
-        """
-        :param item:  {
-            method: "sudo",
-            user: "user",
-            pass: "pass",
-        }
-        :return:
-        """
-        self._become = signer.sign(json.dumps(item)).decode('utf-8')
-
-    @property
-    def options(self):
-        return self.json_decode(self._options) or {}
-
-    @options.setter
-    def options(self, item):
-        self._options = self.json_encode(item)
+        except Exception as e:
+            return {'error': str(e)}, {'dark': {'all': str(e)}}
 
     @property
     def short_id(self):
@@ -310,8 +261,8 @@ class AdHocRunHistory(models.Model):
     timedelta = models.FloatField(default=0.0, verbose_name=_('Time'), null=True)
     is_finished = models.BooleanField(default=False, verbose_name=_('Is finished'))
     is_success = models.BooleanField(default=False, verbose_name=_('Is success'))
-    _result = models.TextField(blank=True, null=True, verbose_name=_('Adhoc raw result'))
-    _summary = models.TextField(blank=True, null=True, verbose_name=_('Adhoc result summary'))
+    result = JsonTextField(blank=True, null=True, default={}, verbose_name=_('Adhoc raw result'))
+    summary = JsonTextField(blank=True, null=True, default={}, verbose_name=_('Adhoc summary'))
 
     @property
     def short_id(self):
@@ -326,34 +277,12 @@ class AdHocRunHistory(models.Model):
         return os.path.join(log_dir, str(self.id) + '.log')
 
     @property
-    def result(self):
-        if self._result:
-            return json.loads(self._result)
-        else:
-            return {}
-
-    @result.setter
-    def result(self, item):
-        self._result = json.dumps(item)
-
-    @property
-    def summary(self):
-        if self._summary:
-            return json.loads(self._summary)
-        else:
-            return {"ok": {}, "dark": {}}
-
-    @summary.setter
-    def summary(self, item):
-        self._summary = json.dumps(item)
-
-    @property
     def success_hosts(self):
-        return self.summary.get('contacted', [])
+        return self.summary.get('contacted', []) if self.summary else []
 
     @property
     def failed_hosts(self):
-        return self.summary.get('dark', {})
+        return self.summary.get('dark', {}) if self.summary else []
 
     def __str__(self):
         return self.short_id
