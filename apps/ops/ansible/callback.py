@@ -1,5 +1,5 @@
 # ~*~ coding: utf-8 ~*~
-
+import datetime
 
 from ansible.plugins.callback import CallbackBase
 from ansible.plugins.callback.default import CallbackModule
@@ -21,11 +21,11 @@ class AdHocResultCallback(CallbackModule):
         #   "contacted": {"hostname",...},
         #   "dark": {"hostname": {"task_name": {}, "task_name": {}},...,},
         # }
+        self.success = True
         self.results_raw = dict(ok={}, failed={}, unreachable={}, skipped={})
         self.results_summary = dict(contacted=[], dark={})
-        f = open('/tmp/123.log', 'w')
-        super().__init__()
-        self._display = LogFileDisplay(f)
+        if log_f:
+            self._display = LogFileDisplay(log_f)
 
     def gather_result(self, t, res):
         self._clean_results(res._result, res._task.action)
@@ -54,6 +54,7 @@ class AdHocResultCallback(CallbackModule):
                 contacted.remove(host)
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
+        self.success = False
         self.gather_result("failed", result)
         super().v2_runner_on_failed(result, ignore_errors=ignore_errors)
 
@@ -66,8 +67,10 @@ class AdHocResultCallback(CallbackModule):
         super().v2_runner_on_skipped(result)
 
     def v2_runner_on_unreachable(self, result):
+        self.success = False
         self.gather_result("unreachable", result)
         super().v2_runner_on_unreachable(result)
+
 
 
 class CommandResultCallback(AdHocResultCallback):

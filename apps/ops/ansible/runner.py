@@ -1,5 +1,5 @@
 # ~*~ coding: utf-8 ~*~
-
+import datetime
 import os
 from collections import namedtuple
 
@@ -157,8 +157,8 @@ class AdHocRunner:
             loader=self.loader, inventory=self.inventory
         )
 
-    def get_result_callback(self):
-        return self.results_callback_class()
+    def get_result_callback(self, log_f=None):
+        return self.results_callback_class(log_f=log_f)
 
     @staticmethod
     def check_module_args(module_name, module_args=''):
@@ -193,7 +193,7 @@ class AdHocRunner:
         if options and isinstance(options, dict):
             self.options = self.options._replace(**options)
 
-    def run(self, tasks, pattern, play_name='Ansible Ad-hoc', gather_facts='no'):
+    def run(self, tasks, pattern, play_name='Ansible Ad-hoc', gather_facts='no', log_f=None):
         """
         :param tasks: [{'action': {'module': 'shell', 'args': 'ls'}, ...}, ]
         :param pattern: all, *, or others
@@ -202,7 +202,7 @@ class AdHocRunner:
         :return:
         """
         self.check_pattern(pattern)
-        self.results_callback = self.get_result_callback()
+        self.results_callback = self.get_result_callback(log_f=log_f)
         cleaned_tasks = self.clean_tasks(tasks)
 
         play_source = dict(
@@ -229,13 +229,21 @@ class AdHocRunner:
         print("Get matched hosts: {}".format(
             self.inventory.get_matched_hosts(pattern)
         ))
-
+        date_start = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.results_callback._display.display(
+            "{} Start task: {}\r\n".format(date_start, play_name)
+        )
         try:
             tqm.run(play)
             return self.results_callback
         except Exception as e:
             raise AnsibleError(e)
         finally:
+            tqm.send_callback('v2_playbook_on_stats', tqm._stats)
+            date_finished = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.results_callback._display.display(
+                "Task finished: {}\r\n".format(date_finished)
+            )
             tqm.cleanup()
             self.loader.cleanup_all_tmp_files()
 

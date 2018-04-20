@@ -24,7 +24,7 @@ class JMSInventory(BaseInventory):
         """
         self.assets = assets or []
         self.nodes = nodes or []
-        self.using_admin = run_as_admin
+        self.run_as_admin = run_as_admin
         self.run_as = run_as
         self.become_info = become_info
         self.vars = vars or {}
@@ -38,14 +38,9 @@ class JMSInventory(BaseInventory):
         groups = []
 
         for asset in assets:
-            info = self.convert_to_ansible(asset, run_as_admin=self.using_admin)
+            info = self.convert_to_ansible(asset)
             hosts.append(info)
             nodes.update(set(asset.nodes.all()))
-
-        if self.run_as:
-            run_user_info = self.get_run_user_info()
-            for host in hosts:
-                host.update(run_user_info)
 
         if self.become_info:
             for host in hosts:
@@ -65,7 +60,7 @@ class JMSInventory(BaseInventory):
             assets.update(_assets)
         return assets
 
-    def convert_to_ansible(self, asset, run_as_admin=False):
+    def convert_to_ansible(self, asset):
         info = {
             'id': asset.id,
             'hostname': asset.hostname,
@@ -76,8 +71,10 @@ class JMSInventory(BaseInventory):
         }
         if asset.domain and asset.domain.has_gateway():
             info["vars"].update(self.make_proxy_command(asset))
-        if run_as_admin:
+        if self.run_as_admin:
             info.update(asset.get_auth_info())
+        if self.run_as:
+            info.update(self.get_run_user_info(asset))
         for node in asset.nodes.all():
             info["groups"].append(node.value)
         for label in asset.labels.all():
@@ -102,12 +99,9 @@ class JMSInventory(BaseInventory):
             })
         return info
 
-    def get_run_user_info(self):
-        system_user = get_system_user_by_name(self.run_as)
-        if not system_user:
-            return {}
-        else:
-            return system_user._to_secret_json()
+    def get_run_user_info(self, asset):
+        info = self.run_as.get_auth(asset)._to_secret_json()
+        return info
 
     @staticmethod
     def make_proxy_command(asset):

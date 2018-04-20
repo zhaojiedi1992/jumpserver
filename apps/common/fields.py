@@ -97,7 +97,7 @@ class JsonMixin:
         if value is None:
             return value
 
-        if not isinstance(value, str) or not value.startswith(':'):
+        if not isinstance(value, str) or not value.startswith('"'):
             return value
         else:
             return self.json_decode(value)

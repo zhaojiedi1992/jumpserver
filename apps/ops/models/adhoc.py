@@ -145,12 +145,12 @@ class AdHoc(models.Model):
     nodes = models.ManyToManyField('assets.Node', blank=True, verbose_name=_("Node"))
     task = models.ForeignKey(AnsibleTask, related_name='adhoc', on_delete=models.CASCADE)
     actions = JsonTextField(verbose_name=_('Actions'))
-    vars = JsonTextField(verbose_name=_('Vars'), default={}, blank=True, null=True)
+    vars = JsonTextField(verbose_name=_('Vars'), blank=True, null=True)
     pattern = models.CharField(max_length=1024, default='all', verbose_name=_('Pattern'))
-    options = JsonCharField(max_length=1024, verbose_name=_('Options'))
-    run_as_admin = models.BooleanField(default=True, verbose_name=_('Run as admin'))
-    run_as = models.CharField(max_length=128, default='', verbose_name=_("Run as"))
-    become = JsonCharField(max_length=1024, default={}, verbose_name=_("Become"))
+    options = JsonCharField(max_length=1024, blank=True, null=True, verbose_name=_('Options'))
+    run_as_admin = models.BooleanField(default=False, verbose_name=_('Run as admin'))
+    run_as = models.ForeignKey('assets.SystemUser', null=True, blank=True, verbose_name=_("Run as"))
+    become = JsonCharField(max_length=1024, blank=True, null=True, verbose_name=_("Become"))
     created_by = models.CharField(max_length=64, default='', null=True, verbose_name=_('Create by'))
     date_created = models.DateTimeField(auto_now_add=True)
 
@@ -174,49 +174,36 @@ class AdHoc(models.Model):
     def total_assets_count(self):
         return len(self.total_assets)
 
-    def run(self, record=True):
-        if record:
-            return self._run_and_record()
-        else:
-            return self._run_only()
-
-    def _run_and_record(self):
-        try:
-            hid = current_task.request.id
-        except AttributeError:
-            hid = str(uuid.uuid4())
-        history = AdHocRunHistory(id=hid, adhoc=self, task=self.task)
+    def run(self):
+        history = AdHocRunHistory(adhoc=self, task=self.task)
+        history.save()
+        log_f = open(history.log_path, 'w')
+        print(history.log_path)
         time_start = time.time()
+        is_success = False
         try:
-            date_start = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(date_start)
-            print(self.task.name)
-            print("{} Start task: {}\r\n".format(date_start, self.task.name))
-            raw, summary = self._run_only()
-            date_end = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print("\r\n{} Task finished".format(date_end))
-            history.is_finished = True
-            if summary.get('dark'):
-                history.is_success = False
-            else:
-                history.is_success = True
-            history.result = raw
-            history.summary = summary
-            return raw, summary
-        except IndexError as e:
-            return {}, {"dark": {"all": str(e)}, "contacted": []}
+            result = self._run(log_f=log_f)
+            if result:
+                is_success = True
+                history.result = result.results_raw
+                history.summary = result.results_summary
+                return result.results_raw, result.results_summary
         finally:
+            log_f.close()
+            history.is_success = is_success
+            history.is_finished = True
             history.date_finished = timezone.now()
             history.timedelta = time.time() - time_start
             history.save()
 
-    def _run_only(self):
+    def _run(self, log_f=None):
         runner = AdHocRunner(self.inventory, options=self.options)
         try:
-            result = runner.run(self.actions, self.pattern, self.task.name)
-            return result.results_raw, result.results_summary
+            result = runner.run(self.actions, self.pattern, self.task.name, log_f=log_f)
+            return result
         except Exception as e:
-            return {'error': str(e)}, {'dark': {'all': str(e)}}
+            logger.warn("Failed run adhoc {}, {}".format(self.task.name, e))
+            return None
 
     @property
     def short_id(self):
@@ -237,7 +224,7 @@ class AdHoc(models.Model):
             return False
         fields_check = []
         for field in self.__class__._meta.fields:
-            if field.name not in ['id', 'date_created']:
+            if field.name not in ['id', 'date_created', 'created_by']:
                 fields_check.append(field)
         for field in fields_check:
             if getattr(self, field.name) != getattr(other, field.name):

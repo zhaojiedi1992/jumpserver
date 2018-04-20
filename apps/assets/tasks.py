@@ -91,13 +91,13 @@ def update_assets_hardware_info_util(assets, task_name=None):
     if task_name is None:
         # task_name = _("Update some assets hardware info")
         task_name = _("更新资产硬件信息")
-    tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
-    hostname_list = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
-    if not hostname_list:
+    actions = const.UPDATE_ASSETS_HARDWARE_TASKS
+    assets = [asset for asset in assets if asset.is_unixlike() and asset.is_active]
+    if not assets:
         logger.info("Not hosts get, may be asset is not active or not unixlike platform")
         return {}
     task, created = update_or_create_ansible_task(
-        task_name, hosts=hostname_list, tasks=tasks, pattern='all',
+        task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
     result = task.run()
@@ -114,30 +114,30 @@ def update_asset_hardware_info_manual(asset):
     return update_assets_hardware_info_util([asset], task_name=task_name)
 
 
-def update_assets_hardware_info_period():
-    """
-    Update asset hardware period task
-    :return:
-    """
-    if PERIOD_TASK != "on":
-        logger.debug("Period task disabled, update assets hardware info pass")
-        return
-
-    from ops.utils import update_or_create_ansible_task
-    # task_name = _("Update assets hardware info period")
-    task_name = _("定期更新资产硬件信息")
-    hostname_list = [
-        asset.hostname for asset in Asset.objects.all()
-        if asset.is_active and asset.is_unixlike()
-    ]
-    tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
-
-    # Only create, schedule by celery beat
-    update_or_create_ansible_task(
-        task_name, hosts=hostname_list, tasks=tasks, pattern='all',
-        options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
-        interval=60*60*24, is_periodic=True, callback=set_assets_hardware_info.name,
-    )
+# def update_assets_hardware_info_period():
+#     """
+#     Update asset hardware period task
+#     :return:
+#     """
+#     if PERIOD_TASK != "on":
+#         logger.debug("Period task disabled, update assets hardware info pass")
+#         return
+#
+#     from ops.utils import update_or_create_ansible_task
+#     # task_name = _("Update assets hardware info period")
+#     task_name = _("定期更新资产硬件信息")
+#     assets = [
+#         asset for asset in Asset.objects.all()
+#         if asset.is_active and asset.is_unixlike()
+#     ]
+#     tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
+#
+#     # Only create, schedule by celery beat
+#     update_or_create_ansible_task(
+#         task_name, hosts=hostname_list, tasks=tasks, pattern='all',
+#         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
+#         interval=60*60*24, is_periodic=True, callback=set_assets_hardware_info.name,
+#     )
 
 
 ##  ADMIN USER CONNECTIVE  ##
@@ -174,13 +174,13 @@ def test_admin_user_connectability_util(admin_user, task_name):
     from ops.utils import update_or_create_ansible_task
 
     assets = admin_user.get_related_assets()
-    hosts = [asset.hostname for asset in assets
-             if asset.is_active and asset.is_unixlike()]
-    if not hosts:
+    assets = [asset for asset in assets
+              if asset.is_active and asset.is_unixlike()]
+    if not assets:
         return
     tasks = const.TEST_ADMIN_USER_CONN_TASKS
     task, created = update_or_create_ansible_task(
-        task_name=task_name, hosts=hosts, tasks=tasks, pattern='all',
+        task_name=task_name, assets=assets, actions=tasks, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
     result = task.run()
@@ -188,19 +188,19 @@ def test_admin_user_connectability_util(admin_user, task_name):
     return result
 
 
-def test_admin_user_connectability_period():
-    """
-    A period task that update the ansible task period
-    """
-    if PERIOD_TASK != "on":
-        logger.debug("Period task disabled, test admin user connectability pass")
-        return
-
-    admin_users = AdminUser.objects.all()
-    for admin_user in admin_users:
-        # task_name = _("Test admin user connectability period: {}".format(admin_user.name))
-        task_name = _("定期测试管理账号可连接性: {}".format(admin_user.name))
-        test_admin_user_connectability_util.delay(admin_user, task_name)
+# def test_admin_user_connectability_period():
+#     """
+#     A period task that update the ansible task period
+#     """
+#     if PERIOD_TASK != "on":
+#         logger.debug("Period task disabled, test admin user connectability pass")
+#         return
+#
+#     admin_users = AdminUser.objects.all()
+#     for admin_user in admin_users:
+#         # task_name = _("Test admin user connectability period: {}".format(admin_user.name))
+#         task_name = _("定期测试管理账号可连接性: {}".format(admin_user.name))
+#         test_admin_user_connectability_util.delay(admin_user, task_name)
 
 
 @shared_task
@@ -217,13 +217,13 @@ def test_asset_connectability_util(assets, task_name=None):
     if task_name is None:
         # task_name = _("Test assets connectability")
         task_name = _("测试资产可连接性")
-    hosts = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
-    if not hosts:
-        logger.info("No hosts, passed")
+    assets = [asset for asset in assets if asset.is_active and asset.is_unixlike()]
+    if not assets:
+        logger.info("No assets, passed")
         return {}
-    tasks = const.TEST_ADMIN_USER_CONN_TASKS
+    actions = const.TEST_ADMIN_USER_CONN_TASKS
     task, created = update_or_create_ansible_task(
-        task_name=task_name, hosts=hosts, tasks=tasks, pattern='all',
+        task_name=task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
     result = task.run()
@@ -269,15 +269,15 @@ def test_system_user_connectability_util(system_user, task_name):
     """
     from ops.utils import update_or_create_ansible_task
     assets = system_user.get_assets()
-    hosts = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
-    tasks = const.TEST_SYSTEM_USER_CONN_TASKS
-    if not hosts:
+    assets = [asset for asset in assets if asset.is_active and asset.is_unixlike()]
+    actions = const.TEST_SYSTEM_USER_CONN_TASKS
+    if not assets:
         logger.info("No hosts, passed")
         return {}
     task, created = update_or_create_ansible_task(
-        task_name, hosts=hosts, tasks=tasks, pattern='all',
+        task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS,
-        run_as=system_user.name, created_by="System",
+        run_as=system_user, created_by="System",
     )
     result = task.run()
     set_system_user_connectablity_info(result, system_user=system_user.name)
@@ -351,25 +351,25 @@ def get_push_system_user_tasks(system_user):
 @shared_task
 def push_system_user_util(system_users, assets, task_name):
     from ops.utils import update_or_create_ansible_task
-    tasks = []
+    actions = []
     for system_user in system_users:
         if not system_user.is_need_push():
             msg = "push system user `{}` passed, may be not auto push or ssh " \
                   "protocol is not ssh".format(system_user.name)
             logger.info(msg)
             continue
-        tasks.extend(get_push_system_user_tasks(system_user))
+        actions.extend(get_push_system_user_tasks(system_user))
 
-    if not tasks:
+    if not actions:
         logger.info("Not tasks, passed")
         return {}
 
-    hosts = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
-    if not hosts:
+    assets = [asset for asset in assets if asset.is_active and asset.is_unixlike()]
+    if not assets:
         logger.info("Not hosts, passed")
         return {}
     task, created = update_or_create_ansible_task(
-        task_name=task_name, hosts=hosts, tasks=tasks, pattern='all',
+        task_name=task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System'
     )
     return task.run()
