@@ -64,19 +64,26 @@ class AdHocRunHistorySet(viewsets.ModelViewSet):
         return self.queryset
 
 
-class CeleryTaskLogApi(generics.RetrieveAPIView):
+class LogTailApi(generics.RetrieveAPIView):
     permission_classes = (IsSuperUser,)
     buff_size = 1024 * 10
     end = False
-    queryset = CeleryTask.objects.all()
+
+    def is_end(self):
+        return False
+
+    def get_log_path(self):
+        raise NotImplementedError()
 
     def get(self, request, *args, **kwargs):
         mark = request.query_params.get("mark") or str(uuid.uuid4())
-        task = super().get_object()
-        log_path = task.full_log_path
+        log_path = self.get_log_path()
 
         if not log_path or not os.path.isfile(log_path):
-            return Response({"data": _("Waiting ...")}, status=203)
+            if self.is_end():
+                return Response({"data": 'Not found the log', 'end': self.is_end(), 'mark': mark})
+            else:
+                return Response({"data": _("Waiting ...")}, status=203)
 
         with open(log_path, 'r') as f:
             offset = cache.get(mark, 0)
@@ -85,7 +92,21 @@ class CeleryTaskLogApi(generics.RetrieveAPIView):
             mark = str(uuid.uuid4())
             cache.set(mark, f.tell(), 5)
 
-            if data == '' and task.is_finished():
+            if data == '' and self.is_end():
                 self.end = True
             return Response({"data": data, 'end': self.end, 'mark': mark})
 
+
+class AdHocHistoryLogApi(LogTailApi):
+    queryset = AdHocRunHistory.objects.all()
+    object = None
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().get(request, *args, **kwargs)
+
+    def get_log_path(self):
+        return self.object.log_path
+
+    def is_end(self):
+        return self.object.is_finished

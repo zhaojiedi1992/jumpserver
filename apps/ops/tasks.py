@@ -14,7 +14,7 @@ def rerun_task():
 @shared_task
 def run_ansible_task(tid, callback=None, **kwargs):
     """
-    :param tid: is the tasks serialized data
+    :param tid: is the ansible task id or adhoc
     :param callback: callback function name
     :return:
     """

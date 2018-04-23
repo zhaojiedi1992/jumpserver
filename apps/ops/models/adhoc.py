@@ -178,32 +178,23 @@ class AdHoc(models.Model):
         history = AdHocRunHistory(adhoc=self, task=self.task)
         history.save()
         log_f = open(history.log_path, 'w')
-        print(history.log_path)
         time_start = time.time()
-        is_success = False
+        result = {}
         try:
-            result = self._run(log_f=log_f)
-            if result:
-                is_success = True
-                history.result = result.results_raw
-                history.summary = result.results_summary
-                return result.results_raw, result.results_summary
+            runner = AdHocRunner(self.inventory, options=self.options)
+            result = runner.run(self.actions, self.pattern, self.task.name, log_f=log_f)
+        except Exception as e:
+            result = {'raw': {}, 'summary': {'dark': {'all': str(e)}}}
         finally:
             log_f.close()
-            history.is_success = is_success
+            history.result = result.get('raw')
+            history.summary = result.get('summary')
+            history.is_success = result.get('success', False)
             history.is_finished = True
             history.date_finished = timezone.now()
             history.timedelta = time.time() - time_start
             history.save()
-
-    def _run(self, log_f=None):
-        runner = AdHocRunner(self.inventory, options=self.options)
-        try:
-            result = runner.run(self.actions, self.pattern, self.task.name, log_f=log_f)
-            return result
-        except Exception as e:
-            logger.warn("Failed run adhoc {}, {}".format(self.task.name, e))
-            return None
+        return result
 
     @property
     def short_id(self):

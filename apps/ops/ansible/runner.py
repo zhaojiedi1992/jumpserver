@@ -1,5 +1,4 @@
 # ~*~ coding: utf-8 ~*~
-import datetime
 import os
 from collections import namedtuple
 
@@ -226,24 +225,19 @@ class AdHocRunner:
             stdout_callback=self.results_callback,
             passwords=self.options.passwords,
         )
-        print("Get matched hosts: {}".format(
+        msg = ("Get matched hosts: {}".format(
             self.inventory.get_matched_hosts(pattern)
         ))
-        date_start = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.results_callback._display.display(
-            "{} Start task: {}\r\n".format(date_start, play_name)
-        )
         try:
+            tqm.send_callback('v2_playbook_on_start', play)
+            self.results_callback._display.display(msg)
             tqm.run(play)
-            return self.results_callback
+            return self.results_callback.results
         except Exception as e:
             raise AnsibleError(e)
         finally:
             tqm.send_callback('v2_playbook_on_stats', tqm._stats)
-            date_finished = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            self.results_callback._display.display(
-                "Task finished: {}\r\n".format(date_finished)
-            )
+            tqm.send_callback('v2_playbook_on_finish', play)
             tqm.cleanup()
             self.loader.cleanup_all_tmp_files()
 

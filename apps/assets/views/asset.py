@@ -285,11 +285,10 @@ class BulkImportAssetView(AdminUserRequiredMixin, JSONResponseMixin, FormView):
                 if v != '':
                     asset_dict[k] = v
 
-            asset_id = asset_dict.pop('id')
+            asset = None
+            asset_id = asset_dict.pop('id', None)
             if asset_id:
                 asset = get_object_or_none(Asset, id=asset_id)
-            else:
-                asset = None
             if not asset:
                 try:
                     if len(Asset.objects.filter(hostname=asset_dict.get('hostname'))):

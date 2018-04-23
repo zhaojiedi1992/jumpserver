@@ -250,7 +250,7 @@ def test_asset_connectability_manual(asset):
 
 @shared_task
 def set_system_user_connectablity_info(result, **kwargs):
-    summary = result[1]
+    summary = result.get('summary', {})
     task_name = kwargs.get("task_name")
     system_user = kwargs.get("system_user")
     if system_user is None:

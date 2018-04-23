@@ -18,6 +18,8 @@ class LogFileDisplay(Display):
         Note: msg *must* be a unicode string to prevent UnicodeError tracebacks.
         """
         super().display(msg, color=color, stderr=stderr, screen_only=screen_only, log_only=log_only)
+        if log_only:
+            return
         if color:
             msg = stringc(msg, color)
         if not msg.endswith(u'\n'):

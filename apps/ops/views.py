@@ -1,5 +1,6 @@
 # ~*~ coding: utf-8 ~*~
 
+from django.shortcuts import reverse
 from django.utils.translation import ugettext as _
 from django.conf import settings
 from django.views.generic import ListView, DetailView, TemplateView
@@ -116,6 +117,21 @@ class AdHocHistoryDetailView(AdminUserRequiredMixin, DetailView):
         context = {
             'app': _('Ops'),
             'action': _('Run history detail'),
+        }
+        kwargs.update(context)
+        return super().get_context_data(**kwargs)
+
+
+class LogTailMixin:
+    template_name = 'ops/log_tail_view.html'
+
+
+class AdHocHistoryLogView(AdminUserRequiredMixin, LogTailMixin, DetailView):
+    model = AdHocRunHistory
+
+    def get_context_data(self, **kwargs):
+        context = {
+            'url': reverse('api-ops:adhoc-history-log', kwargs={'pk': self.object.id})
         }
         kwargs.update(context)
         return super().get_context_data(**kwargs)

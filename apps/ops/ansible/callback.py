@@ -21,9 +21,14 @@ class AdHocResultCallback(CallbackModule):
         #   "contacted": {"hostname",...},
         #   "dark": {"hostname": {"task_name": {}, "task_name": {}},...,},
         # }
-        self.success = True
         self.results_raw = dict(ok={}, failed={}, unreachable={}, skipped={})
         self.results_summary = dict(contacted=[], dark={})
+        self.results = {
+            'raw': self.results_raw,
+            'summary': self.results_summary,
+            'success': True,
+        }
+        super().__init__()
         if log_f:
             self._display = LogFileDisplay(log_f)
 
@@ -54,7 +59,7 @@ class AdHocResultCallback(CallbackModule):
                 contacted.remove(host)
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
-        self.success = False
+        self.results['success'] = False
         self.gather_result("failed", result)
         super().v2_runner_on_failed(result, ignore_errors=ignore_errors)
 
@@ -67,10 +72,22 @@ class AdHocResultCallback(CallbackModule):
         super().v2_runner_on_skipped(result)
 
     def v2_runner_on_unreachable(self, result):
-        self.success = False
+        self.results['success'] = False
         self.gather_result("unreachable", result)
         super().v2_runner_on_unreachable(result)
 
+    def v2_playbook_on_start(self, playbook):
+        date_start = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self._display.display(
+            "{} Start task: {}\r\n".format(date_start, playbook.name)
+        )
+        return super().v2_playbook_on_start(playbook)
+
+    def v2_playbook_on_finish(self, playbook):
+        date_finished = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self._display.display(
+            "{} Task finish\r\n".format(date_finished)
+        )
 
 
 class CommandResultCallback(AdHocResultCallback):
