@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 #
+import datetime
+import os
 import json
 from functools import wraps
 
 from django.db.utils import ProgrammingError, OperationalError
 from django.core.cache import cache
 from django_celery_beat.models import PeriodicTask, IntervalSchedule, CrontabSchedule
+
+from .const import CELERY_LOG_DIR
 
 INTERVAL_UNIT_MAP = {
     's': IntervalSchedule.SECONDS,
@@ -76,17 +80,9 @@ def create_or_update_celery_periodic_tasks(tasks):
 
         _interval = detail.get("interval")
         if isinstance(_interval, int):
-            intervals = IntervalSchedule.objects.filter(
-                every=detail["interval"], period=IntervalSchedule.SECONDS
-            )
-            if intervals:
-                interval = intervals[0]
-            else:
-                interval = IntervalSchedule.objects.create(
-                    every=detail['interval'],
-                    period=IntervalSchedule.SECONDS,
-                )
-        elif isinstance(_interval, str) and _interval[-1].isdigit():
+            _interval = '{}s'.format(_interval)
+
+        if isinstance(_interval, str) and _interval and _interval[:-1].isdigit():
             val = int(_interval[:-1])
             unit = INTERVAL_UNIT_MAP.get(_interval[-1].lower())
             if not unit:
@@ -118,7 +114,7 @@ def create_or_update_celery_periodic_tasks(tasks):
             else:
                 crontab = CrontabSchedule.objects.create(**kwargs)
         else:
-            raise SyntaxError("Schedule is not valid")
+            raise SyntaxError("Schedule is not valid: {}".format(_interval))
 
         defaults = dict(
             interval=interval,
@@ -206,3 +202,13 @@ def after_app_shutdown_clean(func):
     def decorate(*args, **kwargs):
         return func(*args, **kwargs)
     return decorate
+
+
+def get_log_path(task_id):
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+    log_path = os.path.join(now, task_id + '.log')
+    full_path = os.path.join(CELERY_LOG_DIR, log_path)
+
+    if not os.path.exists(os.path.dirname(full_path)):
+        os.makedirs(os.path.dirname(full_path))
+    return full_path

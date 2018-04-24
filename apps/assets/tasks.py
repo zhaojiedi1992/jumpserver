@@ -3,7 +3,7 @@ import json
 import re
 import os
 
-from celery import shared_task
+from celery import shared_task, chain
 from django.core.cache import cache
 from django.utils.translation import ugettext as _
 
@@ -11,6 +11,7 @@ from common.utils import get_object_or_none, capacity_convert, \
     sum_capacity, encrypt_password, get_logger
 
 from .models import SystemUser, AdminUser, Asset
+from ops.tasks import run_adhoc_task
 from . import const
 
 
@@ -33,7 +34,7 @@ def set_assets_hardware_info(result, **kwargs):
     :param kwargs: {task_name: ""}
     :return:
     """
-    result_raw = result[0]
+    result_raw = result.get('raw', {})
     assets_updated = []
     for hostname, info in result_raw.get('ok', {}).items():
         info = info.get('setup', {}).get('ansible_facts', {})
@@ -87,7 +88,7 @@ def update_assets_hardware_info_util(assets, task_name=None):
     :param task_name: task_name running
     :return: result summary ['contacted': {}, 'dark': {}]
     """
-    from ops.utils import update_or_create_ansible_task
+    from ops.utils import update_or_create_adhoc_task
     if task_name is None:
         # task_name = _("Update some assets hardware info")
         task_name = _("更新资产硬件信息")
@@ -96,51 +97,20 @@ def update_assets_hardware_info_util(assets, task_name=None):
     if not assets:
         logger.info("Not hosts get, may be asset is not active or not unixlike platform")
         return {}
-    task, created = update_or_create_ansible_task(
+    task, created = update_or_create_adhoc_task(
         task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
-    result = task.run()
-    # Todo: may be somewhere using
-    # Manual run callback function
-    set_assets_hardware_info(result)
-    return result
+
+    res = chain(run_adhoc_task.s(task.id), set_assets_hardware_info.s())()
+    return res
 
 
-@shared_task
 def update_asset_hardware_info_manual(asset):
     # task_name = _("Update asset hardware info")
     task_name = _("更新资产硬件信息")
-    return update_assets_hardware_info_util([asset], task_name=task_name)
+    return update_assets_hardware_info_util.delay([asset], task_name=task_name)
 
-
-# def update_assets_hardware_info_period():
-#     """
-#     Update asset hardware period task
-#     :return:
-#     """
-#     if PERIOD_TASK != "on":
-#         logger.debug("Period task disabled, update assets hardware info pass")
-#         return
-#
-#     from ops.utils import update_or_create_ansible_task
-#     # task_name = _("Update assets hardware info period")
-#     task_name = _("定期更新资产硬件信息")
-#     assets = [
-#         asset for asset in Asset.objects.all()
-#         if asset.is_active and asset.is_unixlike()
-#     ]
-#     tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
-#
-#     # Only create, schedule by celery beat
-#     update_or_create_ansible_task(
-#         task_name, hosts=hostname_list, tasks=tasks, pattern='all',
-#         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
-#         interval=60*60*24, is_periodic=True, callback=set_assets_hardware_info.name,
-#     )
-
-
-##  ADMIN USER CONNECTIVE  ##
 
 @shared_task
 def set_admin_user_connectability_info(result, **kwargs):
@@ -149,7 +119,7 @@ def set_admin_user_connectability_info(result, **kwargs):
     if admin_user is None and task_name is not None:
         admin_user = task_name.split(":")[-1]
 
-    raw, summary = result
+    summary = result.get('summary')
     cache_key = const.ADMIN_USER_CONN_CACHE_KEY.format(admin_user)
     cache.set(cache_key, summary, CACHE_MAX_TIME)
 
@@ -171,7 +141,7 @@ def test_admin_user_connectability_util(admin_user, task_name):
     :param task_name:
     :return:
     """
-    from ops.utils import update_or_create_ansible_task
+    from ops.utils import update_or_create_adhoc_task
 
     assets = admin_user.get_related_assets()
     assets = [asset for asset in assets
@@ -179,40 +149,23 @@ def test_admin_user_connectability_util(admin_user, task_name):
     if not assets:
         return
     tasks = const.TEST_ADMIN_USER_CONN_TASKS
-    task, created = update_or_create_ansible_task(
+    task, created = update_or_create_adhoc_task(
         task_name=task_name, assets=assets, actions=tasks, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
-    result = task.run()
-    set_admin_user_connectability_info(result, admin_user=admin_user.name)
-    return result
+    c = chain(run_adhoc_task.s(str(task.id)),
+              set_admin_user_connectability_info.s(admin_user=admin_user))
+    return c.delay()
 
 
-# def test_admin_user_connectability_period():
-#     """
-#     A period task that update the ansible task period
-#     """
-#     if PERIOD_TASK != "on":
-#         logger.debug("Period task disabled, test admin user connectability pass")
-#         return
-#
-#     admin_users = AdminUser.objects.all()
-#     for admin_user in admin_users:
-#         # task_name = _("Test admin user connectability period: {}".format(admin_user.name))
-#         task_name = _("定期测试管理账号可连接性: {}".format(admin_user.name))
-#         test_admin_user_connectability_util.delay(admin_user, task_name)
-
-
-@shared_task
 def test_admin_user_connectability_manual(admin_user):
-    # task_name = _("Test admin user connectability: {}").format(admin_user.name)
     task_name = _("测试管理行号可连接性: {}").format(admin_user.name)
-    return test_admin_user_connectability_util(admin_user, task_name)
+    return test_admin_user_connectability_util.delay(admin_user, task_name)
 
 
 @shared_task
 def test_asset_connectability_util(assets, task_name=None):
-    from ops.utils import update_or_create_ansible_task
+    from ops.utils import update_or_create_adhoc_task
 
     if task_name is None:
         # task_name = _("Test assets connectability")
@@ -222,12 +175,12 @@ def test_asset_connectability_util(assets, task_name=None):
         logger.info("No assets, passed")
         return {}
     actions = const.TEST_ADMIN_USER_CONN_TASKS
-    task, created = update_or_create_ansible_task(
+    task, created = update_or_create_adhoc_task(
         task_name=task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
     )
     result = task.run()
-    summary = result[1]
+    summary = result.get('summary', {})
     for k in summary.get('dark'):
         cache.set(const.ASSET_ADMIN_CONN_CACHE_KEY.format(k), 0, CACHE_MAX_TIME)
 
@@ -236,14 +189,8 @@ def test_asset_connectability_util(assets, task_name=None):
     return summary
 
 
-@shared_task
 def test_asset_connectability_manual(asset):
-    summary = test_asset_connectability_util([asset])
-
-    if summary.get('dark'):
-        return False, summary['dark']
-    else:
-        return True, ""
+    return test_asset_connectability_util.delay([asset])
 
 
 ##  System user connective ##
@@ -267,39 +214,26 @@ def test_system_user_connectability_util(system_user, task_name):
     :param task_name:
     :return:
     """
-    from ops.utils import update_or_create_ansible_task
+    from ops.utils import update_or_create_adhoc_task
     assets = system_user.get_assets()
     assets = [asset for asset in assets if asset.is_active and asset.is_unixlike()]
     actions = const.TEST_SYSTEM_USER_CONN_TASKS
     if not assets:
         logger.info("No hosts, passed")
         return {}
-    task, created = update_or_create_ansible_task(
+    task, created = update_or_create_adhoc_task(
         task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS,
         run_as=system_user, created_by="System",
     )
     result = task.run()
-    set_system_user_connectablity_info(result, system_user=system_user.name)
+    set_system_user_connectablity_info(result, system_user=system_user)
     return result
 
 
-@shared_task
 def test_system_user_connectability_manual(system_user):
     task_name = _("Test system user connectability: {}").format(system_user)
-    return test_system_user_connectability_util(system_user, task_name)
-
-
-def test_system_user_connectability_period():
-    if PERIOD_TASK != "on":
-        logger.debug("Period task disabled, test system user connectability pass")
-        return
-
-    system_users = SystemUser.objects.all()
-    for system_user in system_users:
-        # task_name = _("Test system user connectability period: {}".format(system_user))
-        task_name = _("定期测试系统用户可连接性: {}".format(system_user))
-        test_system_user_connectability_util.delay(system_user, task_name)
+    return test_system_user_connectability_util.delay(system_user, task_name)
 
 
 ####  Push system user tasks ####
@@ -350,7 +284,7 @@ def get_push_system_user_tasks(system_user):
 
 @shared_task
 def push_system_user_util(system_users, assets, task_name):
-    from ops.utils import update_or_create_ansible_task
+    from ops.utils import update_or_create_adhoc_task
     actions = []
     for system_user in system_users:
         if not system_user.is_need_push():
@@ -368,7 +302,7 @@ def push_system_user_util(system_users, assets, task_name):
     if not assets:
         logger.info("Not hosts, passed")
         return {}
-    task, created = update_or_create_ansible_task(
+    task, created = update_or_create_adhoc_task(
         task_name=task_name, assets=assets, actions=actions, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System'
     )

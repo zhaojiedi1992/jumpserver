@@ -1,27 +1,43 @@
-import uuid
-
 from django import forms
-from django.db import transaction
+
+from common.forms_base import CombineModelForm
+from .models import AuthChangeTask, AuthChangeContent
 
 
-class SystemUserSettingForm(forms.Form):
-    CHANGE_AUTH_INTERVAL = forms.IntegerField(help_text=_("Units: day"), initial=45, required=False, label=_("Interval"))
-    CHANGE_PASSWORD = forms.BooleanField(initial=True, required=False, label=_("Change password"))
-    CHANGE_SSH_KEY = forms.BooleanField(initial=False, required=False, label=_("Change ssh key"))
-    SAME_IN_ALL_ASSET = forms.BooleanField(initial=True, required=False, label=_("Same in all asset"))
+class AuthChangeTaskForm(forms.ModelForm):
+    class Meta:
+        model = AuthChangeTask
+        exclude = ['id', 'date_created', 'date_updated']
 
-    def __init__(self, *args, instance=None, **kwargs):
+
+class AuthChangeContentForm(forms.ModelForm):
+    class Meta:
+        model = AuthChangeContent
+        exclude = ['id', 'task', '_password', 'created_by', 'date_created']
+
+
+class AuthChangeTaskCreateUpdateForm(CombineModelForm):
+    form_classes = [AuthChangeTaskForm, AuthChangeContentForm]
+
+    def __init__(self, *args, **kwargs):
+        instances = None
+        instance = kwargs.pop('instance')
+        if instance:
+            content = instance.latest_content
+            instances = [instance, content]
+        kwargs['instances'] = instances
         super().__init__(*args, **kwargs)
-        self.instance = instance
-        if instance and instance.cleaned_setting:
-            for name, field in self.fields.items():
-                field.initial = instance.cleaned_setting.get(name)
 
     def save(self):
-        if not self.instance:
-            raise AttributeError("No instance get")
+        task_form = self.get_form(AuthChangeTaskForm)
+        content_form = self.get_form(AuthChangeContentForm)
+        task = task_form.save()
+        content_form.cleaned_data['task'] = task
+        content = content_form.save(commit=False)
+        content.task = task
+        content.save()
+        content_form.save_m2m()
+        return task
 
-        with transaction.atomic():
-            self.instance.cleaned_setting = self.cleaned_data
-            self.instance.save()
-            return self.instance
+
+

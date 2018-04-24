@@ -2,20 +2,20 @@
 from __future__ import unicode_literals
 from rest_framework import serializers
 
-from .models import AnsibleTask, AdHoc, AdHocRunHistory
+from .models import AdHocTask, AdHocContent, AdHocRunHistory
 
 
-class TaskSerializer(serializers.ModelSerializer):
+class AdHocTaskSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AnsibleTask
+        model = AdHocTask
         fields = '__all__'
 
 
-class AdHocSerializer(serializers.ModelSerializer):
+class AdHocContentSerializer(serializers.ModelSerializer):
     total_assets_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = AdHoc
+        model = AdHocContent
         fields = '__all__'
 
     @staticmethod
@@ -39,16 +39,16 @@ class AdHocRunHistorySerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_adhoc_short_id(obj):
-        return obj.adhoc.short_id
+        return obj.content.short_id
 
     @staticmethod
     def get_task(obj):
-        return obj.adhoc.task.id
+        return obj.task.id
 
     @staticmethod
     def get_stat(obj):
         return {
-            "total": len(obj.adhoc.total_assets),
+            "total": len(obj.content.total_assets),
             "success": len(obj.summary.get("contacted", [])) if obj.summary else 0,
             "failed": len(obj.summary.get("dark", [])) if obj.summary else 0,
         }

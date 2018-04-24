@@ -1,21 +1,31 @@
-# ~*~ coding: utf-8 ~*~
+# -*- coding: utf-8 -*-
+#
 
 from django.shortcuts import reverse
 from django.utils.translation import ugettext as _
 from django.conf import settings
-from django.views.generic import ListView, DetailView, TemplateView
+from django.views.generic import ListView, DetailView
 
 from common.mixins import DatetimeSearchMixin
-from .models import AnsibleTask, AdHoc, AdHocRunHistory, CeleryTask
-from .hands import AdminUserRequiredMixin
+from ..models import AdHocTask, AdHocContent, AdHocRunHistory
+from ..hands import AdminUserRequiredMixin
+from .base import LogTailMixin
 
 
-class TaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
+__all__ = [
+    'AdHocTaskListView', 'AdHocTaskDetailView',
+    'AdhocTaskContentListView', 'AdHocContentDetailView',
+    'AdHocContentHistoryListView',
+    'AdHocTaskHistoryListView', 'AdHocHistoryLogView', 'AdHocHistoryDetailView',
+]
+
+
+class AdHocTaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
     paginate_by = settings.DISPLAY_PER_PAGE
-    model = AnsibleTask
+    model = AdHocTask
     ordering = ('-date_created',)
     context_object_name = 'task_list'
-    template_name = 'ops/task_list.html'
+    template_name = 'ops/adhoc_task_list.html'
     keyword = ''
 
     def get_queryset(self):
@@ -35,7 +45,7 @@ class TaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
     def get_context_data(self, **kwargs):
         context = {
             'app': _('Ops'),
-            'action': _('Task list'),
+            'action': _('AdHoc task list'),
             'date_from': self.date_from,
             'date_to': self.date_to,
             'keyword': self.keyword,
@@ -44,9 +54,9 @@ class TaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
         return super().get_context_data(**kwargs)
 
 
-class TaskDetailView(AdminUserRequiredMixin, DetailView):
-    model = AnsibleTask
-    template_name = 'ops/task_detail.html'
+class AdHocTaskDetailView(AdminUserRequiredMixin, DetailView):
+    model = AdHocTask
+    template_name = 'ops/adhoc_task_detail.html'
 
     def get_context_data(self, **kwargs):
         context = {
@@ -57,9 +67,9 @@ class TaskDetailView(AdminUserRequiredMixin, DetailView):
         return super().get_context_data(**kwargs)
 
 
-class TaskAdhocView(AdminUserRequiredMixin, DetailView):
-    model = AnsibleTask
-    template_name = 'ops/task_adhoc.html'
+class AdhocTaskContentListView(AdminUserRequiredMixin, DetailView):
+    model = AdHocTask
+    template_name = 'ops/adhoc_task_content_list.html'
 
     def get_context_data(self, **kwargs):
         context = {
@@ -70,9 +80,9 @@ class TaskAdhocView(AdminUserRequiredMixin, DetailView):
         return super().get_context_data(**kwargs)
 
 
-class TaskHistoryView(AdminUserRequiredMixin, DetailView):
-    model = AnsibleTask
-    template_name = 'ops/task_history.html'
+class AdHocTaskHistoryListView(AdminUserRequiredMixin, DetailView):
+    model = AdHocTask
+    template_name = 'ops/adhoc_task_history_list.html'
 
     def get_context_data(self, **kwargs):
         context = {
@@ -83,9 +93,9 @@ class TaskHistoryView(AdminUserRequiredMixin, DetailView):
         return super().get_context_data(**kwargs)
 
 
-class AdHocDetailView(AdminUserRequiredMixin, DetailView):
-    model = AdHoc
-    template_name = 'ops/adhoc_detail.html'
+class AdHocContentDetailView(AdminUserRequiredMixin, DetailView):
+    model = AdHocContent
+    template_name = 'ops/adhoc_content_detail.html'
 
     def get_context_data(self, **kwargs):
         context = {
@@ -96,9 +106,9 @@ class AdHocDetailView(AdminUserRequiredMixin, DetailView):
         return super().get_context_data(**kwargs)
 
 
-class AdHocHistoryView(AdminUserRequiredMixin, DetailView):
-    model = AdHoc
-    template_name = 'ops/adhoc_history.html'
+class AdHocContentHistoryListView(AdminUserRequiredMixin, DetailView):
+    model = AdHocContent
+    template_name = 'ops/adhoc_content_history.html'
 
     def get_context_data(self, **kwargs):
         context = {
@@ -122,10 +132,6 @@ class AdHocHistoryDetailView(AdminUserRequiredMixin, DetailView):
         return super().get_context_data(**kwargs)
 
 
-class LogTailMixin:
-    template_name = 'ops/log_tail_view.html'
-
-
 class AdHocHistoryLogView(AdminUserRequiredMixin, LogTailMixin, DetailView):
     model = AdHocRunHistory
 
@@ -135,8 +141,3 @@ class AdHocHistoryLogView(AdminUserRequiredMixin, LogTailMixin, DetailView):
         }
         kwargs.update(context)
         return super().get_context_data(**kwargs)
-
-
-class CeleryTaskLogView(AdminUserRequiredMixin, DetailView):
-    template_name = 'ops/celery_task_log.html'
-    model = CeleryTask

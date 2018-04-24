@@ -16,16 +16,16 @@
                     <div class="panel-options">
                         <ul class="nav nav-tabs">
                             <li>
-                                <a href="{% url 'ops:task-detail' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Task detail' %} </a>
+                                <a href="{% url 'ops:adhoc-task-detail' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Task detail' %} </a>
                             </li>
                             <li class="active">
-                                <a href="{% url 'ops:task-adhoc' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Task versions' %} </a>
+                                <a href="{% url 'ops:adhoc-task-content-list' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Task versions' %} </a>
                             </li>
                             <li>
-                                <a href="{% url 'ops:task-history' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Run history' %} </a>
+                                <a href="{% url 'ops:adhoc-task-history-list' pk=object.pk %}" class="text-center"><i class="fa fa-laptop"></i> {% trans 'Run history' %} </a>
                             </li>
                             <li>
-                                <a class="text-center celery-task-log" onclick="window.open('{% url 'ops:celery-task-log' pk=object.latest_history.pk %}','', 'width=800,height=600')"><i class="fa fa-laptop"></i> {% trans 'Last run output' %} </a>
+                                <a class="text-center celery-task-log" onclick="window.open('{% url 'ops:adhoc-history-log' pk=object.latest_history.pk %}','', 'width=800,height=600')"><i class="fa fa-laptop"></i> {% trans 'Last run output' %} </a>
                             </li>
                         </ul>
                     </div>
@@ -106,7 +106,7 @@
                         $(td).html(d.toLocaleString())
                     }},
                     {targets: 7, createdCell: function (td, cellData, rowData) {
-                       var detail_btn = '<a class="btn btn-xs btn-primary m-l-xs btn-run" href="{% url 'ops:adhoc-detail' pk=DEFAULT_PK %}">{% trans "Detail" %}</a>'.replace('{{ DEFAULT_PK }}', cellData);
+                       var detail_btn = '<a class="btn btn-xs btn-primary m-l-xs btn-run" href="{% url 'ops:adhoc-content-detail' pk=DEFAULT_PK %}">{% trans "Detail" %}</a>'.replace('{{ DEFAULT_PK }}', cellData);
                        if (cellData) {
                            $(td).html(detail_btn);
                        }

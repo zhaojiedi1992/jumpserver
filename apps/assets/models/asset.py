@@ -213,6 +213,7 @@ class AssetAuthBook(AssetUser):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     name = models.CharField(max_length=128, blank=True, null=True)
     asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True)
+    is_active = models.BooleanField(default=False)
 
     CACHE_KEY = '{}_{}_auth'
     objects = AssetAuthBookQuerySet.as_manager()
@@ -231,11 +232,12 @@ class AssetAuthBook(AssetUser):
         auth_cached = cache.get(key, None)
         if auth_cached:
             return auth_cached
-        try:
-            auth = cls.objects.filter(asset=asset_id, username=username).latest()
+
+        book = cls.objects.filter(asset=asset_id, username=username, is_active=True)
+        if book:
+            auth = book.latest()
             auth.set_cache()
-            return auth
-        except cls.DoesNotExist:
+        else:
             return None
 
     def expire_cache(self):

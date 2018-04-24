@@ -1,12 +1,10 @@
 # ~*~ coding: utf-8 ~*~
 
-import json
 import uuid
 import os
 import time
 import datetime
 
-from celery import current_task
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -21,42 +19,42 @@ from ..celery.utils import delete_celery_periodic_task, \
 from ..ansible import AdHocRunner
 from ..inventory import JMSInventory
 
-__all__ = ["AnsibleTask", "AdHoc", "AdHocRunHistory"]
+__all__ = ["AdHocTask", "AdHocContent", "AdHocRunHistory"]
 
 
 logger = get_logger(__file__)
 signer = get_signer()
 
 
-class AnsibleTask(models.Model):
+class AdHocTask(models.Model):
     """
     This task is different ansible task, Task like 'push system user', 'get asset info' ..
     One task can have some versions of adhoc, run a task only run the latest version adhoc
     """
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
-    interval = models.IntegerField(verbose_name=_("Interval"), null=True, blank=True, help_text=_("Units: seconds"))
+    interval = models.CharField(verbose_name=_("Interval"), null=True, blank=True, help_text=_("10s/1m/1h/1d"), max_length=8)
     crontab = models.CharField(verbose_name=_("Crontab"), null=True, blank=True, max_length=128, help_text=_("5 * * * *"))
     is_periodic = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     comment = models.TextField(blank=True, verbose_name=_("Comment"))
     created_by = models.CharField(max_length=128, blank=True, null=True, default='')
     date_created = models.DateTimeField(auto_now_add=True)
-    __latest_adhoc = None
+    __latest_content = None
 
     @property
     def short_id(self):
         return str(self.id).split('-')[-1]
 
     @property
-    def latest_adhoc(self):
-        if not self.__latest_adhoc:
-            self.__latest_adhoc = self.get_latest_adhoc()
-        return self.__latest_adhoc
+    def latest_content(self):
+        if not self.__latest_content:
+            self.__latest_content = self.get_latest_content()
+        return self.__latest_content
 
-    @latest_adhoc.setter
-    def latest_adhoc(self, item):
-        self.__latest_adhoc = item
+    @latest_content.setter
+    def latest_content(self, item):
+        self.__latest_content = item
 
     @property
     def latest_history(self):
@@ -65,10 +63,10 @@ class AnsibleTask(models.Model):
         except AdHocRunHistory.DoesNotExist:
             return None
 
-    def get_latest_adhoc(self):
+    def get_latest_content(self):
         try:
-            return self.adhoc.all().latest()
-        except AdHoc.DoesNotExist:
+            return self.content.all().latest()
+        except AdHocContent.DoesNotExist:
             return None
 
     @property
@@ -83,14 +81,14 @@ class AnsibleTask(models.Model):
         return self.history.all()
 
     def run(self):
-        if self.latest_adhoc:
-            return self.latest_adhoc.run()
+        if self.latest_content:
+            return self.latest_content.run()
         else:
-            return {'error': 'No adhoc'}
+            return {'error': 'No adhoc task'}
 
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):
-        from ..tasks import run_ansible_task
+        from ..tasks import run_adhoc_task
         super().save(
             force_insert=force_insert,  force_update=force_update,
             using=using, update_fields=update_fields,
@@ -99,7 +97,7 @@ class AnsibleTask(models.Model):
         if self.is_periodic:
             tasks = {
                 self.name: {
-                    "task": run_ansible_task.name,
+                    "task": run_adhoc_task.name,
                     "interval": self.interval or None,
                     "crontab": self.crontab or None,
                     "args": (str(self.id),),
@@ -128,7 +126,7 @@ class AnsibleTask(models.Model):
         get_latest_by = 'date_created'
 
 
-class AdHoc(models.Model):
+class AdHocContent(models.Model):
     """
     task: A task reference
     actions: [{'name': 'task_name', 'action': {'module': '', 'args': ''}, 'other..': ''}, ]
@@ -143,7 +141,7 @@ class AdHoc(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     assets = models.ManyToManyField('assets.Asset', blank=True, verbose_name=_("Asset"))  # ['hostname1', 'hostname2']
     nodes = models.ManyToManyField('assets.Node', blank=True, verbose_name=_("Node"))
-    task = models.ForeignKey(AnsibleTask, related_name='adhoc', on_delete=models.CASCADE)
+    task = models.ForeignKey(AdHocTask, related_name='content', on_delete=models.CASCADE)
     actions = JsonTextField(verbose_name=_('Actions'))
     vars = JsonTextField(verbose_name=_('Vars'), blank=True, null=True)
     pattern = models.CharField(max_length=1024, default='all', verbose_name=_('Pattern'))
@@ -175,7 +173,7 @@ class AdHoc(models.Model):
         return len(self.total_assets)
 
     def run(self):
-        history = AdHocRunHistory(adhoc=self, task=self.task)
+        history = AdHocRunHistory(content=self, task=self.task)
         history.save()
         log_f = open(history.log_path, 'w')
         time_start = time.time()
@@ -223,24 +221,23 @@ class AdHoc(models.Model):
         return True
 
     class Meta:
-        db_table = "ops_adhoc"
         get_latest_by = 'date_created'
 
 
 class AdHocRunHistory(models.Model):
     """
-    AdHoc running history.
+    AdHocContent running history.
     """
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
-    task = models.ForeignKey(AnsibleTask, related_name='history', on_delete=models.SET_NULL, null=True)
-    adhoc = models.ForeignKey(AdHoc, related_name='history', on_delete=models.SET_NULL, null=True)
-    date_start = models.DateTimeField(auto_now_add=True, verbose_name=_('Start time'))
-    date_finished = models.DateTimeField(blank=True, null=True, verbose_name=_('End time'))
+    task = models.ForeignKey(AdHocTask, related_name='history', on_delete=models.SET_NULL, null=True)
+    content = models.ForeignKey(AdHocContent, related_name='history', on_delete=models.SET_NULL, null=True)
     timedelta = models.FloatField(default=0.0, verbose_name=_('Time'), null=True)
     is_finished = models.BooleanField(default=False, verbose_name=_('Is finished'))
     is_success = models.BooleanField(default=False, verbose_name=_('Is success'))
     result = JsonTextField(blank=True, null=True, default={}, verbose_name=_('Adhoc raw result'))
     summary = JsonTextField(blank=True, null=True, default={}, verbose_name=_('Adhoc summary'))
+    date_start = models.DateTimeField(auto_now_add=True, verbose_name=_('Start time'))
+    date_finished = models.DateTimeField(blank=True, null=True, verbose_name=_('End time'))
 
     @property
     def short_id(self):
@@ -266,5 +263,4 @@ class AdHocRunHistory(models.Model):
         return self.short_id
 
     class Meta:
-        db_table = "ops_adhoc_history"
         get_latest_by = 'date_start'

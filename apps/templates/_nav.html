@@ -53,10 +53,13 @@
 </li>
 <li id="ops">
     <a>
-        <i class="fa fa-coffee" style="width: 14px"></i> <span class="nav-label">{% trans 'Job Center' %}</span><span class="fa arrow"></span>
+        <i class="fa fa-coffee" style="width: 14px"></i> <span class="nav-label">{% trans 'Task Center' %}</span><span class="fa arrow"></span>
     </a>
     <ul class="nav nav-second-level">
-        <li id="task"><a href="{% url 'ops:task-list' %}">{% trans 'Task list' %}</a></li>
+        <li id="adhoc"><a href="{% url 'ops:adhoc-task-list' %}">{% trans 'AdHoc task' %}</a></li>
+    </ul>
+    <ul class="nav nav-second-level">
+        <li id="auth-change"><a href="{% url 'ops:auth-change-task-list' %}">{% trans 'Auth change task' %}</a></li>
     </ul>
 </li>
 <li id="audits">
@@ -67,15 +70,6 @@
         <li id="ftp-log"><a href="{% url 'audits:ftp-log-list' %}">{% trans 'FTP log' %}</a></li>
     </ul>
 </li>
-{#<li id="">#}
-{#    <a href="#">#}
-{#        <i class="fa fa-download"></i> <span class="nav-label">{% trans 'File' %}</span><span class="fa arrow"></span>#}
-{#    </a>#}
-{#    <ul class="nav nav-second-level">#}
-{#        <li id="upload"><a href="">{% trans 'File upload' %}</a></li>#}
-{#        <li id="download"><a href="">{% trans 'File download' %}</a></li>#}
-{#    </ul>#}
-{#</li>#}
 <li id="settings">
     <a href="{% url 'settings:basic-setting' %}">
         <i class="fa fa-gears"></i> <span class="nav-label">{% trans 'Settings' %}</span><span class="label label-info pull-right"></span>

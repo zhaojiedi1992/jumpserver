@@ -89,7 +89,7 @@ class AssetRefreshHardwareApi(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
         asset = get_object_or_404(Asset, pk=asset_id)
-        task = update_asset_hardware_info_manual.delay(asset)
+        task = update_asset_hardware_info_manual(asset)
         return Response({"task": task.id})
 
 
@@ -103,5 +103,5 @@ class AssetAdminUserTestApi(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
         asset = get_object_or_404(Asset, pk=asset_id)
-        task = test_asset_connectability_manual.delay(asset)
+        task = test_asset_connectability_manual(asset)
         return Response({"task": task.id})

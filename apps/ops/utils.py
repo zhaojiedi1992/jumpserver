@@ -1,15 +1,15 @@
 # ~*~ coding: utf-8 ~*~
 from common.utils import get_logger, get_object_or_none
-from .models import AnsibleTask, AdHoc
+from .models import AdHocTask, AdHocContent
 
 logger = get_logger(__file__)
 
 
 def get_task_by_id(task_id):
-    return get_object_or_none(AnsibleTask, id=task_id)
+    return get_object_or_none(AdHocTask, id=task_id)
 
 
-def update_or_create_ansible_task(
+def update_or_create_adhoc_task(
         task_name, assets=None, actions=None, nodes=None,
         interval=None, crontab=None, is_periodic=False,
         pattern='all', options=None, run_as_admin=False,
@@ -32,36 +32,36 @@ def update_or_create_ansible_task(
     }
 
     created = False
-    task, _ = AnsibleTask.objects.update_or_create(
+    task, _ = AdHocTask.objects.update_or_create(
         defaults=defaults, name=task_name,
     )
 
-    adhoc = task.latest_adhoc
-    new_adhoc = AdHoc(
+    content = task.latest_content
+    new_content = AdHocContent(
         task=task, actions=actions, vars=vars, pattern=pattern,
         options=options, run_as_admin=run_as_admin,
         run_as=run_as, become=become, created_by=created_by
     )
 
     changed = False
-    if not adhoc or adhoc != new_adhoc:
+    if not content or content != new_content:
         logger.debug("Adhoc changed")
         changed = True
-    elif assets and set(assets) != set(adhoc.assets.all()):
+    elif assets and set(assets) != set(content.assets.all()):
         logger.debug("Assets changed")
         changed = True
-    elif nodes and set(nodes) != set(adhoc.nodes.all()):
+    elif nodes and set(nodes) != set(content.nodes.all()):
         logger.debug("Nodes changed")
         changed = True
 
     if changed:
         logger.debug("Task create new adhoc: {}".format(task_name))
-        new_adhoc.save()
+        new_content.save()
         if assets:
-            new_adhoc.assets.set(assets)
+            new_content.assets.set(assets)
         if nodes:
-            new_adhoc.nodes.set(nodes)
-        task.latest_adhoc = new_adhoc
+            new_content.nodes.set(nodes)
+        task.latest_content = new_content
         created = True
     return task, created
 

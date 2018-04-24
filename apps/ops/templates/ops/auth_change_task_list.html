@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block content_left_head %}
-{#    <div class="uc pull-left m-r-5"><a class="btn btn-sm btn-primary btn-create-asset"> {% trans "Create task" %} </a></div>#}
+    <div class="uc pull-left m-r-5"><a href="{% url 'ops:auth-change-task-create' %}" class="btn btn-sm btn-primary btn-create-asset"> {% trans "Create task" %} </a></div>
 {% endblock %}
 
 
@@ -35,7 +35,8 @@
     <th class="text-center">{% trans 'Name' %}</th>
     <th class="text-center">{% trans 'Run times' %}</th>
     <th class="text-center">{% trans 'Versions' %}</th>
-    <th class="text-center">{% trans 'Hosts' %}</th>
+    <th class="text-center">{% trans 'Asset' %}</th>
+    <th class="text-center">{% trans 'Node' %}</th>
     <th class="text-center">{% trans 'Success' %}</th>
     <th class="text-center">{% trans 'Date' %}</th>
     <th class="text-center">{% trans 'Time' %}</th>
@@ -46,12 +47,14 @@
     {% for object in task_list %}
         <tr class="gradeX">
             <td class="text-center"><input type="checkbox" class="cbx-term"> </td>
-            <td class="text-left"><a href="{% url 'ops:task-detail' pk=object.id %}">{{ object.name }}</a></td>
+            <td class="text-left"><a href="{% url 'ops:adhoc-task-detail' pk=object.id %}">{{ object.name }}</a></td>
             <td class="text-center">
-                <span class="text-danger">{{ object.history_summary.failed }}</span>/<span class="text-navy">{{ object.history_summary.success}}</span>/{{ object.history_summary.total}}
+                {{ object.history.all.count }}
+{#                <span class="text-danger">{{ object.history_summary.failed }}</span>/<span class="text-navy">{{ object.history_summary.success}}</span>/{{ object.history_summary.total}}#}
             </td>
-            <td class="text-center">{{ object.adhoc.all.count }}</td>
-            <td class="text-center">{{ object.latest_adhoc.total_assets_count }}</td>
+            <td class="text-center">{{ object.content.all.count }}</td>
+            <td class="text-center">{{ object.latest_content.assets.all.count }}</td>
+            <td class="text-center">{{ object.latest_content.nodes.all.count }}</td>
             <td class="text-center">
             {% if object.latest_history %}
                 {% if object.latest_history.is_success %}

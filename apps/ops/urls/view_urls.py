@@ -10,14 +10,18 @@ __all__ = ["urlpatterns"]
 app_name = "ops"
 
 urlpatterns = [
-    # TResource Task url
-    url(r'^task/$', views.TaskListView.as_view(), name='task-list'),
-    url(r'^task/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.TaskDetailView.as_view(), name='task-detail'),
-    url(r'^task/(?P<pk>[0-9a-zA-Z\-]{36})/adhoc/$', views.TaskAdhocView.as_view(), name='task-adhoc'),
-    url(r'^task/(?P<pk>[0-9a-zA-Z\-]{36})/history/$', views.TaskHistoryView.as_view(), name='task-history'),
-    url(r'^adhoc/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AdHocDetailView.as_view(), name='adhoc-detail'),
-    url(r'^adhoc/(?P<pk>[0-9a-zA-Z\-]{36})/history/$', views.AdHocHistoryView.as_view(), name='adhoc-history'),
+    url(r'^adhoc/$', views.AdHocTaskListView.as_view(), name='adhoc-task-list'),
+    url(r'^adhoc/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AdHocTaskDetailView.as_view(), name='adhoc-task-detail'),
+    url(r'^adhoc/(?P<pk>[0-9a-zA-Z\-]{36})/version/$', views.AdhocTaskContentListView.as_view(), name='adhoc-task-content-list'),
+    url(r'^adhoc/(?P<pk>[0-9a-zA-Z\-]{36})/history/$', views.AdHocTaskHistoryListView.as_view(), name='adhoc-task-history-list'),
+    url(r'^adhoc/version/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AdHocContentDetailView.as_view(), name='adhoc-content-detail'),
+    url(r'^adhoc/version/(?P<pk>[0-9a-zA-Z\-]{36})/history/$', views.AdHocContentHistoryListView.as_view(), name='adhoc-content-history-list'),
     url(r'^adhoc/history/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AdHocHistoryDetailView.as_view(), name='adhoc-history-detail'),
     url(r'^adhoc/history/(?P<pk>[0-9a-zA-Z\-]{36})/log/$', views.AdHocHistoryLogView.as_view(), name='adhoc-history-log'),
+
     url(r'^celery/task/(?P<pk>[0-9a-zA-Z\-]{36})/log/$', views.CeleryTaskLogView.as_view(), name='celery-task-log'),
+
+    url(r'^auth-change/$', views.AuthChangeTaskListView.as_view(), name='auth-change-task-list'),
+    url(r'^auth-change/create/$', views.AuthChangeTaskCreateView.as_view(), name='auth-change-task-create'),
+    url(r'^auth-change/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AuthChangeTaskDetailView.as_view(), name='auth-change-task-detail'),
 ]

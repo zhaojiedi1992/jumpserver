@@ -71,5 +71,5 @@ class SystemUserTestConnectiveApi(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         system_user = self.get_object()
-        task = test_system_user_connectability_manual.delay(system_user)
+        task = test_system_user_connectability_manual(system_user)
         return Response({"task": task.id})

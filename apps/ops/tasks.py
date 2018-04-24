@@ -1,28 +1,22 @@
 # coding: utf-8
-from celery import shared_task, subtask
+from celery import shared_task, subtask, Task
 
 from common.utils import get_logger, get_object_or_none
-from .models import AnsibleTask, AuthChangeTask
+from .models import AdHocTask, AuthChangeTask
 
 logger = get_logger(__file__)
 
 
-def rerun_task():
-    pass
-
-
 @shared_task
-def run_ansible_task(tid, callback=None, **kwargs):
+def run_adhoc_task(tid, callback=None, **kwargs):
     """
     :param tid: is the ansible task id or adhoc
     :param callback: callback function name
     :return:
     """
-    task = get_object_or_none(AnsibleTask, id=tid)
+    task = get_object_or_none(AdHocTask, id=tid)
     if task:
         result = task.run()
-        if callback is not None:
-            subtask(callback).delay(result, task_name=task.name)
         return result
     else:
         logger.error("No ansible task found: {}".format(tid))
