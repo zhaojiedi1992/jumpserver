@@ -42,7 +42,8 @@ class CombineModelForm(forms.Form):
         cleaned_data = super().clean()
         for cls in self.form_classes:
             form = self.get_form(cls)
-            cleaned_data.update(form.cleaned_data)
+            if hasattr(form, 'cleaned_data'):
+                cleaned_data.update(form.cleaned_data)
         return cleaned_data
 
     def save(self):

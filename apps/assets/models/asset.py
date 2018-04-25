@@ -204,7 +204,6 @@ class AssetAuthBookQuerySet(models.QuerySet):
 
     def update(self, **kwargs):
         for obj in self:
-            print("Expire cache")
             obj.expire_cache()
         return super().update(**kwargs)
 

@@ -1,19 +1,20 @@
 # ~*~ coding: utf-8 ~*~
-import uuid
-import os
-
-from django.core.cache import cache
 from django.shortcuts import get_object_or_404
-from django.utils.translation import ugettext as _
 from rest_framework import viewsets, generics
 from rest_framework.views import Response
 
-from .hands import IsSuperUser
-from .models import AdHocTask, AdHocContent, AdHocRunHistory
-from .serializers import AdHocTaskSerializer, AdHocContentSerializer, \
+from common.permissions import IsSuperUser
+from ..models import AdHocTask, AdHocContent, AdHocRunHistory
+from ..serializers import AdHocTaskSerializer, AdHocContentSerializer, \
     AdHocRunHistorySerializer
-from .tasks import run_adhoc_task
-from .celery.utils import get_log_path
+from ..tasks import run_adhoc_task
+from .base import LogTailApi
+
+
+__all__ = [
+    'AdHocTaskViewSet', 'AdHocTaskRunApi', 'AdHocContentViewSet',
+    'AdHocRunHistoryViewSet', 'AdHocHistoryLogApi',
+]
 
 
 class AdHocTaskViewSet(viewsets.ModelViewSet):
@@ -63,39 +64,6 @@ class AdHocRunHistoryViewSet(viewsets.ModelViewSet):
         return self.queryset
 
 
-class LogTailApi(generics.RetrieveAPIView):
-    permission_classes = (IsSuperUser,)
-    buff_size = 1024 * 10
-    end = False
-
-    def is_end(self):
-        return False
-
-    def get_log_path(self):
-        raise NotImplementedError()
-
-    def get(self, request, *args, **kwargs):
-        mark = request.query_params.get("mark") or str(uuid.uuid4())
-        log_path = self.get_log_path()
-
-        if not log_path or not os.path.isfile(log_path):
-            if self.is_end():
-                return Response({"data": 'Not found the log', 'end': self.is_end(), 'mark': mark})
-            else:
-                return Response({"data": _("Waiting ...\n")}, status=200)
-
-        with open(log_path, 'r') as f:
-            offset = cache.get(mark, 0)
-            f.seek(offset)
-            data = f.read(self.buff_size).replace('\n', '\r\n')
-            mark = str(uuid.uuid4())
-            cache.set(mark, f.tell(), 5)
-
-            if data == '' and self.is_end():
-                self.end = True
-            return Response({"data": data, 'end': self.end, 'mark': mark})
-
-
 class AdHocHistoryLogApi(LogTailApi):
     queryset = AdHocRunHistory.objects.all()
     object = None
@@ -109,25 +77,3 @@ class AdHocHistoryLogApi(LogTailApi):
 
     def is_end(self):
         return self.object.is_finished
-
-
-class CeleryLogApi(LogTailApi):
-    task_id = None
-
-    def get(self, request, *args, **kwargs):
-        self.task_id = kwargs.get('pk')
-        return super().get(request, *args, **kwargs)
-
-    def get_log_path(self):
-        return get_log_path(self.task_id)
-
-    def is_end(self):
-        ret = cache.get(self.task_id)
-        if not ret:
-            return True
-        if ret.children:
-            for i in ret.children:
-                if not i.ready():
-                    return False
-            return True
-        return ret.ready()

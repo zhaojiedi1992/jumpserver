@@ -5,8 +5,29 @@
 
 {% block form %}
 <form id="groupForm" method="post" class="form-horizontal">
+    {% if form.no_field_errors %}
+         <div class="alert alert-danger">
+             {{ form.non_field_errors }}
+         </div>
+    {% endif %}
     {% csrf_token %}
-    {% bootstrap_form form layout="horizontal" %}
+    <h3>{% trans 'Basic' %}</h3>
+    {% bootstrap_field form.name layout="horizontal" %}
+    {% bootstrap_field form.assets layout="horizontal" %}
+    {% bootstrap_field form.nodes layout="horizontal" %}
+    {% bootstrap_field form.username layout="horizontal" %}
+    <div class="hr-line-dashed"></div>
+
+    <h3>{% trans 'Period' %}</h3>
+    {% bootstrap_field form.interval layout="horizontal" %}
+    {% bootstrap_field form.crontab layout="horizontal" %}
+    <div class="hr-line-dashed"></div>
+
+    <h3>{% trans 'Other' %}</h3>
+    {% bootstrap_field form.different layout="horizontal" %}
+    {% bootstrap_field form.is_active layout="horizontal" %}
+    {% bootstrap_field form.comment layout="horizontal" %}
+
 
     <div class="hr-line-dashed"></div>
     <div class="form-group">
@@ -26,7 +47,7 @@ $(document).ready(function () {
     $('.select2').select2().off("select2:open");
 }).on('click', '.select2-selection__rendered', function (e) {
     e.preventDefault();
-    $("#asset_list_modal").modal();
+    {#$("#asset_list_modal").modal();#}
 })
 .on('click', '#btn_asset_modal_confirm', function () {
     var assets = asset_table2.selected;

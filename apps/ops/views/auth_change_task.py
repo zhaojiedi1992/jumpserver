@@ -9,12 +9,12 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from common.mixins import DatetimeSearchMixin
 from ..models import AuthChangeTask
 from ..hands import AdminUserRequiredMixin
-from ..forms import AuthChangeTaskForm, AuthChangeContentForm, AuthChangeTaskCreateUpdateForm
+from ..forms import AuthChangeTaskCreateUpdateForm
 
 
 __all__ = [
     'AuthChangeTaskListView', 'AuthChangeTaskDetailView',
-    'AuthChangeTaskCreateView',
+    'AuthChangeTaskCreateView', 'AuthChangeTaskUpdateView',
 ]
 
 
@@ -58,12 +58,28 @@ class AuthChangeTaskCreateView(AdminUserRequiredMixin, CreateView):
     template_name = 'ops/auth_change_task_create_update.html'
     success_url = reverse_lazy('ops:auth-change-task-list')
 
+    def get_context_data(self, **kwargs):
+        context = {
+            'app': _('Ops'),
+            'action': _('Create auth change task'),
+        }
+        kwargs.update(context)
+        return super().get_context_data(**kwargs)
+
 
 class AuthChangeTaskUpdateView(AdminUserRequiredMixin, UpdateView):
     model = AuthChangeTask
     form_class = AuthChangeTaskCreateUpdateForm
     template_name = 'ops/auth_change_task_create_update.html'
     success_url = reverse_lazy('ops:auth-change-task-list')
+
+    def get_context_data(self, **kwargs):
+        context = {
+            'app': _('Ops'),
+            'action': _('Update auth change task'),
+        }
+        kwargs.update(context)
+        return super().get_context_data(**kwargs)
 
 
 class AuthChangeTaskDetailView(AdminUserRequiredMixin, DetailView):

@@ -172,10 +172,12 @@ class AdHocContent(models.Model):
     def total_assets_count(self):
         return len(self.total_assets)
 
-    def run(self):
+    def run(self, log_path=None):
         history = AdHocRunHistory(content=self, task=self.task)
         history.save()
-        log_f = open(history.log_path, 'w')
+        if not log_path:
+            log_path = history.log_path
+        log_f = open(log_path, 'w')
         time_start = time.time()
         result = {}
         try:
@@ -190,7 +192,7 @@ class AdHocContent(models.Model):
             history.is_success = result.get('success', False)
             history.is_finished = True
             history.date_finished = timezone.now()
-            history.timedelta = time.time() - time_start
+            history.timedelta = round(time.time() - time_start, 2)
             history.save()
         return result
 

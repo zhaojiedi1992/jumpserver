@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 #
 import uuid
+import datetime
+import os
+import time
 
+from django.conf import settings
 from django.utils import timezone
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
@@ -13,16 +17,16 @@ from ..celery.utils import delete_celery_periodic_task, \
     create_or_update_celery_periodic_tasks, \
     disable_celery_periodic_task
 
-__all__ = ['AuthChangeTask', 'AuthChangeContent', 'ChangeAuthRunHistory']
+__all__ = ['AuthChangeTask', 'AuthChangeContent', 'AuthChangeRunHistory']
 signer = get_signer()
 
 
 class AuthChangeTask(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
-    name = models.CharField(max_length=128, unique=True)
-    interval = models.IntegerField(verbose_name=_("Interval"), default=45, help_text=_("Units: day"))
+    name = models.CharField(max_length=128, unique=True, verbose_name=_("Name"))
+    interval = models.IntegerField(verbose_name=_("Interval"), default=45, blank=True, null=True, help_text=_("Units: day"))
     crontab = models.CharField(max_length=32, verbose_name=_("Crontab"), blank=True, null=True, help_text="* * 4 * *")
-    different = models.BooleanField(default=False, verbose_name=_("Different every asset"))
+    different = models.BooleanField(default=False, verbose_name=_("Different"))
     is_active = models.BooleanField(default=True, verbose_name=_("Is active"))
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
@@ -32,6 +36,13 @@ class AuthChangeTask(models.Model):
     def latest_content(self):
         try:
             return AuthChangeContent.objects.filter(task=self).latest()
+        except AuthChangeContent.DoesNotExist:
+            return None
+
+    @property
+    def latest_history(self):
+        try:
+            return AuthChangeRunHistory.objects.filter(task=self).latest()
         except AuthChangeContent.DoesNotExist:
             return None
 
@@ -146,9 +157,10 @@ class AuthChangeContent(models.Model):
             actions=self.get_tasks(), pattern='all', run_as_admin=True,
             vars=_vars,
         )
-        history = ChangeAuthRunHistory(content=self, task=self.task)
+        history = AuthChangeRunHistory(content=self, task=self.task)
         history.save()
         results = {}
+        time_start = time.time()
         try:
             results = ansible_task.run()
             self.update_auth_book(results, book)
@@ -158,6 +170,7 @@ class AuthChangeContent(models.Model):
             history.is_success = results.get('success', False)
             history.is_finished = True
             history.date_finished = timezone.now()
+            history.timedelta = round(time.time() - time_start, 2)
             history.save()
 
     @staticmethod
@@ -194,16 +207,28 @@ class AuthChangeContent(models.Model):
         return super().delete(using=using, keep_parents=keep_parents)
 
 
-class ChangeAuthRunHistory(models.Model):
+class AuthChangeRunHistory(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     order_num = models.IntegerField()
     results = JsonTextField(blank=True, default={})
-    task = models.ForeignKey(AuthChangeTask, on_delete=models.SET_NULL, null=True, related_name='history')
-    content = models.ForeignKey(AuthChangeContent, on_delete=models.SET_NULL, null=True, related_name='history')
+    task = models.ForeignKey(AuthChangeTask, on_delete=models.SET_NULL,
+                             null=True, related_name='history')
+    content = models.ForeignKey(AuthChangeContent, on_delete=models.SET_NULL,
+                                null=True, related_name='history')
     is_finished = models.BooleanField(default=False)
     is_success = models.BooleanField(default=False)
+    timedelta = models.FloatField(default=0.0, verbose_name=_('Time'),
+                                  null=True)
     date_start = models.DateTimeField(auto_now_add=True)
     date_finished = models.DateTimeField(null=True)
+
+    @property
+    def log_path(self):
+        dt = datetime.datetime.now().strftime('%Y-%m-%d')
+        log_dir = os.path.join(settings.PROJECT_DIR, 'data', 'ansible', dt)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        return os.path.join(log_dir, str(self.id) + '.log')
 
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):

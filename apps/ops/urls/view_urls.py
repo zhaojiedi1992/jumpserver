@@ -23,5 +23,6 @@ urlpatterns = [
 
     url(r'^auth-change/$', views.AuthChangeTaskListView.as_view(), name='auth-change-task-list'),
     url(r'^auth-change/create/$', views.AuthChangeTaskCreateView.as_view(), name='auth-change-task-create'),
+    url(r'^auth-change/(?P<pk>[0-9a-zA-Z\-]{36})/update/$', views.AuthChangeTaskUpdateView.as_view(), name='auth-change-task-update'),
     url(r'^auth-change/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AuthChangeTaskDetailView.as_view(), name='auth-change-task-detail'),
 ]

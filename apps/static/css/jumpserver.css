@@ -264,10 +264,7 @@ table.dataTable tbody td.selected td i.text-navy {
 
 .form-asset-on {
     border: 1px solid #e5e6e7;
-    padding-top: 5px;
-    padding-bottom: 0px;
-    padding-left: 5px;
-    padding-right: 5px;
+    padding: 5px 5px 0 5px;
     min-height: 34px;
     height: 100%;
 }
@@ -439,3 +436,17 @@ div.dataTables_wrapper div.dataTables_filter {
 }
 
 
+.select2-container--default .select2-selection--multiple {
+    background-color: white;
+    border: 1px solid #aaa;
+    border-radius: 1px !important;
+    cursor: text;
+}
+
+.select2-container .select2-search--inline .select2-search__field {
+    box-sizing: border-box;
+    border: none;
+    font-size: 14px !important;
+    margin-top: 5px;
+    padding: 1px 0 1px 7px !important;
+}
