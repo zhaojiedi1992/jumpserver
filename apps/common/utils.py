@@ -379,20 +379,12 @@ def get_signer():
     return signer
 
 
-class TeeObj:
-    origin_stdout = sys.stdout
+class StdRedirectFile:
+    def __init__(self, log_f):
+        self.log_f = log_f
+        self.origin_outs = sys.stdout, sys.stderr
+        sys.stdout = log_f
+        sys.stderr = log_f
 
-    def __init__(self, file_obj):
-        self.file_obj = file_obj
-
-    def write(self, msg):
-        self.origin_stdout.write(msg)
-        self.file_obj.write(msg.replace('*', ''))
-
-    def flush(self):
-        self.origin_stdout.flush()
-        self.file_obj.flush()
-
-    def close(self):
-        self.file_obj.close()
-
+    def restore(self):
+        sys.stdout, sys.stderr = self.origin_outs

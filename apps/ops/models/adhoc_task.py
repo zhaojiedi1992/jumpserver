@@ -172,21 +172,19 @@ class AdHocContent(models.Model):
     def total_assets_count(self):
         return len(self.total_assets)
 
-    def run(self, log_path=None):
+    def run(self):
         history = AdHocRunHistory(content=self, task=self.task)
         history.save()
-        if not log_path:
-            log_path = history.log_path
-        log_f = open(log_path, 'w')
+        # log_path = history.log_path
+        # log_f = open(log_path, 'w')
         time_start = time.time()
         result = {}
         try:
             runner = AdHocRunner(self.inventory, options=self.options)
-            result = runner.run(self.actions, self.pattern, self.task.name, log_f=log_f)
+            result = runner.run(self.actions, self.pattern, self.task.name, log_f=None)
         except Exception as e:
             result = {'raw': {}, 'summary': {'dark': {'all': str(e)}}}
         finally:
-            log_f.close()
             history.result = result.get('raw')
             history.summary = result.get('summary')
             history.is_success = result.get('success', False)

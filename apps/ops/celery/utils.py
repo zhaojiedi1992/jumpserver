@@ -4,12 +4,14 @@ import datetime
 import os
 import json
 from functools import wraps
+import sys
 
 from django.db.utils import ProgrammingError, OperationalError
 from django.core.cache import cache
 from django_celery_beat.models import PeriodicTask, IntervalSchedule, CrontabSchedule
 
 from .const import CELERY_LOG_DIR
+from .contrib import NoStripLoggingProxy
 
 INTERVAL_UNIT_MAP = {
     's': IntervalSchedule.SECONDS,
@@ -204,6 +206,17 @@ def after_app_shutdown_clean(func):
     return decorate
 
 
+def log_task_stdout(func):
+    def deco(*args, **kwargs):
+        print("Log task")
+        print(func)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            pass
+    return deco
+
+
 def get_log_path(task_id):
     now = datetime.datetime.now().strftime("%Y-%m-%d")
     log_path = os.path.join(now, task_id + '.log')
@@ -212,3 +225,9 @@ def get_log_path(task_id):
     if not os.path.exists(os.path.dirname(full_path)):
         os.makedirs(os.path.dirname(full_path))
     return full_path
+
+
+def redirect_stdout(logger):
+    proxy = NoStripLoggingProxy(logger, 'INFO')
+    sys.stdout = proxy
+    sys.stderr = proxy

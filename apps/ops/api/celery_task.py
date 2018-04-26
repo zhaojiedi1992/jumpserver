@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-from django.core.cache import cache
+from celery.result import AsyncResult
 
 from .base import LogTailApi
 from ..celery.utils import get_log_path
@@ -19,12 +19,7 @@ class CeleryLogApi(LogTailApi):
         return get_log_path(self.task_id)
 
     def is_end(self):
-        ret = cache.get(self.task_id)
-        if not ret:
+        ret = AsyncResult(self.task_id)
+        if ret.ready():
             return True
-        if ret.children:
-            for i in ret.children:
-                if not i.ready():
-                    return False
-            return True
-        return ret.ready()
+        return False

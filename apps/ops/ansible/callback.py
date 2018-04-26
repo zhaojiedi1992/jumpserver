@@ -3,7 +3,7 @@ import datetime
 
 from ansible.plugins.callback import CallbackBase
 from ansible.plugins.callback.default import CallbackModule
-from .display import LogFileDisplay
+from .display import LogFileDisplay, Display
 
 
 class AdHocResultCallback(CallbackModule):
@@ -31,6 +31,9 @@ class AdHocResultCallback(CallbackModule):
         super().__init__()
         if log_f:
             self._display = LogFileDisplay(log_f)
+        else:
+            self._display = Display()
+        self._display.columns = 79
 
     def gather_result(self, t, res):
         self._clean_results(res._result, res._task.action)

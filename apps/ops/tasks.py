@@ -2,6 +2,7 @@
 from celery import shared_task, subtask, Task
 
 from common.utils import get_logger, get_object_or_none
+from .celery.utils import log_task_stdout
 from .models import AdHocTask, AuthChangeTask
 
 logger = get_logger(__file__)

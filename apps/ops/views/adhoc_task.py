@@ -5,6 +5,7 @@ from django.shortcuts import reverse
 from django.utils.translation import ugettext as _
 from django.conf import settings
 from django.views.generic import ListView, DetailView
+from celery.result import AsyncResult
 
 from common.mixins import DatetimeSearchMixin
 from ..models import AdHocTask, AdHocContent, AdHocRunHistory
@@ -43,12 +44,14 @@ class AdHocTaskListView(AdminUserRequiredMixin, DatetimeSearchMixin, ListView):
         return self.queryset
 
     def get_context_data(self, **kwargs):
+        res = AsyncResult("180821e7-5190-4d64-97af-6d18f48bb20b")
         context = {
             'app': _('Ops'),
             'action': _('AdHoc task list'),
             'date_from': self.date_from,
             'date_to': self.date_to,
             'keyword': self.keyword,
+            'task': {"task": res.id, "state": res.state}
         }
         kwargs.update(context)
         return super().get_context_data(**kwargs)
