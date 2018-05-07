@@ -16,7 +16,7 @@ class Node(models.Model):
     child_mark = models.IntegerField(default=0)
     date_create = models.DateTimeField(auto_now_add=True)
 
-    is_asset = False
+    is_node = True
 
     def __str__(self):
         return self.full_value
@@ -63,8 +63,8 @@ class Node(models.Model):
         assets = Asset.objects.filter(nodes__id=self.id)
         return assets
 
-    def get_active_assets(self):
-        return self.get_assets().filter(is_active=True)
+    def get_valid_assets(self):
+        return self.get_assets().valid()
 
     def get_all_assets(self):
         from .asset import Asset
@@ -78,8 +78,8 @@ class Node(models.Model):
     def has_assets(self):
         return self.get_all_assets()
 
-    def get_all_active_assets(self):
-        return self.get_all_assets().filter(is_active=True)
+    def get_all_valid_assets(self):
+        return self.get_all_assets().valid()
 
     def is_root(self):
         return self.key == '0'
