@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap3 %}
+{% load i18n %}
+{% load common_tags %}
+{% block custom_head_css_js %}
+    <script src="{% static 'js/bootstrap.min.js' %}"></script>
+{% endblock %}
+
+
+{% block content %}
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox float-e-margins">
+                    <div class="panel-options">
+                        <ul class="nav nav-tabs">
+                            <li>
+                                <a href="{% url 'settings:basic-setting' %}" class="text-center"><i
+                                        class="fa fa-cubes"></i> {% trans 'Basic setting' %}</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'settings:email-setting' %}" class="text-center"><i
+                                        class="fa fa-envelope"></i> {% trans 'Email setting' %} </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'settings:ldap-setting' %}" class="text-center"><i
+                                        class="fa fa-archive"></i> {% trans 'LDAP setting' %} </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'settings:terminal-setting' %}" class="text-center"><i
+                                        class="fa fa-hdd-o"></i> {% trans 'Terminal setting' %} </a>
+                            </li>
+                            <li class="active">
+                                <a href="{% url 'settings:cloud-setting' %}" class="text-center"><i
+                                        class="fa fa-cloud"></i> {% trans 'Cloud setting' %} </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="tab-content">
+                        <div class="col-sm-12" style="padding-left:0">
+                            <div id="cloud-table" class="ibox-content" style="border-width: 0;padding-top: 40px;">
+                               <div class="uc m-r-5"><a class="btn btn-sm btn-primary btn-create-cloud-info"> {% trans "Create cloud infomation" %} </a></div>
+                               <div class="hr-line-dashed"></div>
+
+                               <h3>{% trans "Cloud information" %}</h3>
+                                <table class="table table-hover" id="task-history-list-table">
+                                    <thead>
+                                    <tr>
+                                        <th class="text-center">{% trans 'Name' %}</th>
+                                        <th class="text-center">{% trans 'Provider' %}</th>
+                                        <th class="text-center">{% trans 'Import asset' %}</th>
+                                        <th class="text-center">{% trans 'Action' %}<th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for name, value in cloud_infos.items %}
+                                        <tr>
+                                            <td class="text-center">{{ name }}</td>
+                                            <td class="text-center">{{ value.provider }}</td>
+                                            <td class="text-center">
+                                                <a class="btn btn-xs btn-info btn_cloud_auto_access_to">{% trans 'Automatic access to' %}</a>
+                                            </td>
+                                            <td class="text-center">
+                                                <a class="btn btn-xs btn-danger btn_cloud_info_delete">{% trans 'Delete' %}</a>
+                                            <td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'common/_cloud_create_modal.html' %}
+
+{% endblock %}
+
+{% block custom_foot_js %}
+<script>
+
+$(document).ready(function(){
+
+})
+.on('click', '.btn-create-cloud-info', function(){
+        $('#create-cloud-info').modal();
+    })
+
+.on('click', '.btn_cloud_info_delete', function () {
+    var $this = $(this);
+    var name = $(this).closest("tr").find(":nth-child(1)").html();
+    function doDelete(obj, name){
+        var url = '{% url 'api-common:cloud-operating' %}';
+        var data = {
+            'name': name,
+            'csrfmiddlewaretoken': "{% csrf_token %}"
+        };
+        $.ajax({
+            method: 'DELETE',
+            url: url,
+            data: JSON.stringify(data),
+            contentType: "application/json; charset=utf-8"
+        }).done(function(data){
+            $(obj).parent().parent().remove();
+            if(data.succeed){
+                toastr.success(data.msg)
+            }
+            else{
+                toastr.error(data.msg)
+            }
+        })
+    }
+    swal({
+        title: '你确定删除吗 ?',
+        text: " [ " + name + " ] ",
+        type: "warning",
+        showCancelButton: true,
+        cancelButtonText: '取消',
+        confirmButtonColor: "#ed5565",
+        confirmButtonText: '确认',
+        closeOnConfirm: true
+    }, function () {
+        doDelete($this, name)
+    });
+})
+.on('click', '.btn_cloud_auto_access_to', function(){
+    var $this = $(this);
+    var name = $(this).closest("tr").find(":nth-child(1)").html();
+    function doAutoAccessTo(obj, name){
+        var url = '{% url 'api-common:cloud-operating' %}';
+        var data = {
+            'name': name,
+            'csrfmiddlewaretoken': "{% csrf_token %}"
+        };
+        $.ajax({
+            method: 'POST',
+            url: url,
+            data: JSON.stringify(data),
+            contentType: "application/json; charset=utf-8"
+        }).done(function(data){
+            if(data.succeed){
+                swal('自动获取成功!', '( 资产管理>资产列表>左侧节点树 ) 可查看资产', 'success');
+                toastr.success(data.msg)
+            }
+            else{
+                toastr.error(data.msg)
+            }
+        });
+    }
+    swal({
+        title: '你要自动获取吗 ?',
+        text: '全部获取'+' [ ' + name + ' ] '+'账户下的所有资产',
+        type: "warning",
+        showCancelButton: true,
+        cancelButtonText: '取消',
+        confirmButtonColor: "#ed5565",
+        confirmButtonText: '确认',
+        closeOnConfirm: true
+    }, function(){
+        doAutoAccessTo($this, name)
+    })
+})
+</script>
+
+{% endblock %}

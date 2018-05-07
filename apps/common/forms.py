@@ -10,6 +10,9 @@ from django.conf import settings
 
 from .models import Setting
 from .fields import DictField
+from common.utils import get_logger
+
+logger = get_logger(__file__)
 
 
 def to_model_value(value):
@@ -167,4 +170,93 @@ class TerminalSettingForm(BaseForm):
             "You can set other storage and some terminal using"
         )
     )
+
+
+class CloudSettingForm(BaseForm):
+    CLOUD_PROVIDER_CHOICES = (
+        ('aliyun', _('Aliyun')),
+    )
+    NAME = forms.CharField(
+        max_length=1024, label=_("Name")
+    )
+    CLOUD_PROVIDER = forms.ChoiceField(
+        choices=CLOUD_PROVIDER_CHOICES, initial='aliyun',
+        label=_("Cloud provider")
+    )
+    ACCESS_KEY_ID = forms.CharField(
+        max_length=1024, label=_("Access key id"),
+        help_text=_("Enter the access key id for the cloud service")
+    )
+    ACCESS_KEY_SECRET = forms.CharField(
+        max_length=1024, label=_("Access key secret"),
+        help_text=_("Enter the access key secret for the cloud service")
+    )
+
+    @staticmethod
+    def get_or_create(category='default'):
+        cloud_setting = 'CLOUD_SETTING'
+        defaults = {
+            'name': cloud_setting,
+            'value': '{}',
+            'category': category,
+        }
+        obj, created = Setting.objects.get_or_create(
+            defaults=defaults, name=cloud_setting,
+        )
+        cloud_infos = json.loads(obj.value)
+        return cloud_infos
+
+    @staticmethod
+    def update_or_create(cloud_infos, category='default'):
+        cloud_setting = 'CLOUD_SETTING'
+        defaults = {
+            'name': cloud_setting,
+            'value': to_model_value(cloud_infos),
+            'category': category,
+        }
+        Setting.objects.update_or_create(
+            defaults=defaults, name=cloud_setting,
+        )
+
+    @classmethod
+    def get_info_by_name(cls, name):
+        cloud_infos = cls.get_or_create()
+        cloud_info = cloud_infos.get(name, None)
+        cloud_info.update({'name': name})
+        return cloud_info
+
+    @classmethod
+    def delete_info_by_name(cls, name):
+        cloud_infos = cls.get_or_create()
+        try:
+            cloud_infos.pop(name)
+            cls.update_or_create(cloud_infos)
+            return True
+        except Exception as e:
+            logger.error(e)
+            return False
+
+    def save(self, category="default"):
+        if not self.is_bound:
+            raise ValueError("Form is not bound")
+
+        if self.is_valid():
+            with transaction.atomic():
+                name = self.cleaned_data.get('NAME', None)
+                provider = self.cleaned_data.get('CLOUD_PROVIDER', None)
+                access_key_id = self.cleaned_data.get('ACCESS_KEY_ID', None)
+                access_key_secret = self.cleaned_data.get('ACCESS_KEY_SECRET', None)
+                info = {
+                    name:
+                        {
+                            'provider': provider,
+                            'access_key_id': access_key_id,
+                            'access_key_secret': access_key_secret,
+                        }
+                }
+                cloud_infos = self.get_or_create(category=category)
+                cloud_infos.update(info)
+                self.update_or_create(cloud_infos, category=category)
+        else:
+            raise ValueError(self.errors)
 

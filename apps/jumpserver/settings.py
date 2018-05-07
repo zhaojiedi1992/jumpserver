@@ -394,6 +394,14 @@ TERMINAL_REPLAY_STORAGE = {
     },
 }
 
+# CLOUD_SETTING = {
+#     "name": {
+#         "PROVIDER": "",
+#         "ACCESS_KEY_ID": "",
+#         "ACCESS_KEY_SECRET": "",
+#     },
+# }
+
 # Django bootstrap3 setting, more see http://django-bootstrap3.readthedocs.io/en/latest/settings.html
 BOOTSTRAP3 = {
     'horizontal_label_class': 'col-md-2',

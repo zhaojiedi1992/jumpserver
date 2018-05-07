@@ -1,0 +1,46 @@
+{% extends '_modal.html' %}
+{% load i18n %}
+{% load static %}
+{% load common_tags %}
+{% load bootstrap3 %}
+
+{% block modal_class %}modal-lg{% endblock %}
+{% block modal_id %}create-cloud-info{% endblock %}
+{% block modal_title%}{% trans "Create cloud infomation" %}{% endblock %}
+<br>
+{% block modal_body %}
+     <form action="" method="post" class="form-horizontal">
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {% csrf_token %}
+
+        {% for field in form %}
+            {% if not field.field|is_bool_field %}
+                {% bootstrap_field field layout="horizontal" %}
+            {% else %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}"
+                           class="col-sm-2 control-label">{{ field.label }}</label>
+                    <div class="col-sm-8">
+                        <div class="col-sm-1">
+                            {{ field }}
+                        </div>
+                        <div class="col-sm-9">
+                            <span class="help-block">{{ field.help_text }}</span>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+{% endblock %}
+{% block modal_button %}
+        <div class="form-group">
+            <button data-dismiss="modal" class="btn btn-white" type="button">{% trans "Close" %}</button>
+            <button id="submit_button" class="btn btn-primary" type="submit">{% trans 'Confirm' %}</button>
+        </div>
+    </form>
+{% endblock %}

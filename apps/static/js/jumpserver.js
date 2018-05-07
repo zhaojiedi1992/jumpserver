@@ -173,7 +173,7 @@ function APIUpdateAttr(props) {
         }
         if (typeof props.success === 'function') {
             return props.success(data);
-        } 
+        }
     }).fail(function(jqXHR, textStatus, errorThrown) {
         if (flash_message) {
             toastr.error(fail_message);
