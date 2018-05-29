@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 import os
+from django.core.cache import cache
 from django.shortcuts import render
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -43,11 +44,15 @@ __all__ = [
 class UserLoginView(FormView):
     template_name = 'users/login.html'
     form_class = forms.UserLoginForm
+    form_class_captcha = forms.UserLoginCaptchaForm
     redirect_field_name = 'next'
+    key_prefix = "_LOGIN_INVALID_{}"
 
     def get(self, request, *args, **kwargs):
         if request.user.is_staff:
-            return redirect(self.get_success_url())
+            return redirect(redirect_user_first_login_or_index(
+                request, self.redirect_field_name)
+            )
         request.session.set_test_cookie()
         return super().get(request, *args, **kwargs)
 
@@ -57,6 +62,21 @@ class UserLoginView(FormView):
 
         set_tmp_user_to_cache(self.request, form.get_user())
         return redirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        ip = get_login_ip(self.request)
+        cache.set(self.key_prefix.format(ip), 1, 3600)
+        old_form = form
+        form = self.form_class_captcha(data=form.data)
+        form._errors = old_form.errors
+        return super().form_invalid(form)
+
+    def get_form_class(self):
+        ip = get_login_ip(self.request)
+        if cache.get(self.key_prefix.format(ip)):
+            return self.form_class_captcha
+        else:
+            return self.form_class
 
     def get_success_url(self):
         user = get_user_or_tmp_user(self.request)
@@ -260,6 +280,16 @@ class UserFirstLoginView(LoginRequiredMixin, SessionWizardView):
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
         form.instance = self.request.user
+
+        if isinstance(form, forms.UserMFAForm):
+            choices = form.fields["otp_level"].choices
+            if self.request.user.otp_force_enabled:
+                choices = [(k, v) for k, v in choices if k == 2]
+            else:
+                choices = [(k, v) for k, v in choices if k in [0, 1]]
+            form.fields["otp_level"].choices = choices
+            form.fields["otp_level"].initial = self.request.user.otp_level
+
         return form
 
 

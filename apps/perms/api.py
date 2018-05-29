@@ -6,7 +6,7 @@ from rest_framework.views import APIView, Response
 from rest_framework.generics import ListAPIView, get_object_or_404, RetrieveUpdateAPIView
 from rest_framework import viewsets
 
-from common.utils import set_or_append_attr_bulk
+from common.utils import set_or_append_attr_bulk, get_object_or_none
 from users.permissions import IsValidUser, IsSuperUser, IsSuperUserOrAppUser
 from .utils import AssetPermissionUtil
 from .models import AssetPermission
@@ -41,7 +41,7 @@ class AssetPermissionViewSet(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, pk=asset_id)
             permissions = set(queryset.filter(assets=asset))
             for node in asset.nodes.all():
-                inherit_nodes.update(set(node.ancestor_with_node))
+                inherit_nodes.update(set(node.ancestor_with_self))
         elif node_id:
             node = get_object_or_404(Node, pk=node_id)
             permissions = set(queryset.filter(nodes=node))
