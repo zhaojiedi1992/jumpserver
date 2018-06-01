@@ -57,6 +57,8 @@ class AssetPermissionUtil:
     def __init__(self, obj):
         self.object = obj
         self._permissions = None
+        self._assets = None
+        self._nodes_with_assets = None
 
     @property
     def permissions(self):
@@ -93,6 +95,8 @@ class AssetPermissionUtil:
         return assets
 
     def get_assets(self):
+        if self._assets:
+            return self._assets
         assets = self.get_assets_direct()
         nodes = self.get_nodes_direct()
         for node, system_users in nodes.items():
@@ -101,6 +105,7 @@ class AssetPermissionUtil:
                 if isinstance(asset, Node):
                     print(_assets)
                 assets[asset].update(system_users)
+        self._assets = assets
         return assets
 
     def get_nodes_with_assets(self):
@@ -109,6 +114,8 @@ class AssetPermissionUtil:
         {"node": {"assets": set("system_user")}}
         :return:
         """
+        if self._nodes_with_assets:
+            return self._nodes_with_assets
         assets = self.get_assets()
         nodes = defaultdict(dict)
         for asset, system_users in assets.items():
@@ -118,6 +125,7 @@ class AssetPermissionUtil:
                     nodes[node][asset].update(system_users)
                 else:
                     nodes[node][asset] = system_users
+        self._nodes_with_assets = nodes
         return nodes
 
 

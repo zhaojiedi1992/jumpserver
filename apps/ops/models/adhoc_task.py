@@ -17,7 +17,7 @@ from ..celery.utils import delete_celery_periodic_task, \
     create_or_update_celery_periodic_tasks, \
     disable_celery_periodic_task
 from ..ansible import AdHocRunner
-from ..inventory import JMSInventory
+from ..inventory import AdHocInventory
 
 __all__ = ["AdHocTask", "AdHocContent", "AdHocRunHistory"]
 
@@ -155,7 +155,7 @@ class AdHocContent(models.Model):
     @property
     def inventory(self):
         become_info = {'become': self.become} if self.become else None
-        inventory = JMSInventory(
+        inventory = AdHocInventory(
             self.assets.all(), nodes=self.nodes.all(), run_as_admin=self.run_as_admin,
             run_as=self.run_as, become_info=become_info, vars=self.vars,
         )

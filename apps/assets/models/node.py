@@ -110,7 +110,7 @@ class Node(models.Model):
             assets = Asset.objects.all()
         else:
             pattern = r'^{0}$|^{0}:'.format(self.key)
-            assets = Asset.objects.filter(nodes__key__regex=pattern)
+            assets = Asset.objects.filter(nodes__key__regex=pattern).distinct()
         return assets
 
     def get_all_valid_assets(self):
@@ -166,6 +166,5 @@ class Node(models.Model):
         obj, created = cls.objects.get_or_create(
             key='0', defaults={"key": '0', 'value': "ROOT"}
         )
-        print(obj)
         return obj
 

@@ -4,3 +4,4 @@
 from .adhoc_task import *
 from .celery import *
 from .auth_change_task import *
+from .project import *
