@@ -16,6 +16,7 @@ import calendar
 import threading
 from io import StringIO
 import uuid
+from functools import wraps
 
 import paramiko
 import sshpubkeys
@@ -388,3 +389,17 @@ class StdRedirectFile:
 
     def restore(self):
         sys.stdout, sys.stderr = self.origin_outs
+
+def with_cache(func):
+    cache = {}
+    key = "_{}.{}".format(func.__module__, func.__name__)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        cached = cache.get(key)
+        if cached:
+            return cached
+        res = func(*args, **kwargs)
+        cache[key] = res
+        return res
+    return wrapper
