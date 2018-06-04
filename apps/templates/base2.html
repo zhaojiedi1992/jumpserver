@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Jumpserver </title>
+
+    {% include '_head_css_js.html' %}
+</head>
+
+<body class="top-navigation">
+
+    <div id="wrapper">
+        <div id="page-wrapper" class="gray-bg">
+        {% include '_nav2.html' %}
+        <div class="wrapper wrapper-content">
+            <div class="container">
+            {% block content %}
+            {% endblock %}
+            </div>
+        </div>
+        {% include '_footer.html' %}
+        </div>
+    </div>
+    {% include '_foot_js.html' %}
+    <script>
+        $(document).ready(function() {
+        });
+    </script>
+
+</body>
+
+</html>

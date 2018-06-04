@@ -12,6 +12,7 @@ router = DefaultRouter()
 router.register(r'v1/adhoc/tasks', api.AdHocTaskViewSet, 'adhoc-task')
 router.register(r'v1/adhoc/contents', api.AdHocContentViewSet, 'adhoc-content')
 router.register(r'v1/adhoc/history', api.AdHocRunHistoryViewSet, 'adhoc-history')
+router.register(r'v1/projects', api.ProjectViewSet, 'project')
 
 urlpatterns = [
     url(r'^v1/adhoc/tasks/(?P<pk>[0-9a-zA-Z\-]{36})/run/$', api.AdHocTaskRunApi.as_view(), name='adhoc-task-run'),

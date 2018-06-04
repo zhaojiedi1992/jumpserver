@@ -25,4 +25,12 @@ urlpatterns = [
     url(r'^auth-change/create/$', views.AuthChangeTaskCreateView.as_view(), name='auth-change-task-create'),
     url(r'^auth-change/(?P<pk>[0-9a-zA-Z\-]{36})/update/$', views.AuthChangeTaskUpdateView.as_view(), name='auth-change-task-update'),
     url(r'^auth-change/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.AuthChangeTaskDetailView.as_view(), name='auth-change-task-detail'),
+
+    url(r'^projects/$', views.ProjectListView.as_view(), name='project-list'),
+    url(r'^projects/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.ProjectDetailView.as_view(), name='project-detail'),
+
+    url(r'^jobs/$', views.JobListView.as_view(), name='job-list'),
+    url(r'^jobs/(?P<pk>[0-9a-zA-Z\-]{36})/$', views.JobDetailView.as_view(), name='job-detail'),
+    url(r'^jobs/create/$', views.JobCreateView.as_view(), name='job-create'),
+    url(r'^jobs/(?P<pk>[0-9a-zA-Z\-]{36})/update/$', views.JobUpdateView.as_view(), name='job-update'),
 ]

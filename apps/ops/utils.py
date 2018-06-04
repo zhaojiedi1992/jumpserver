@@ -1,4 +1,10 @@
 # ~*~ coding: utf-8 ~*~
+import os
+import yaml
+import importlib
+
+import ansible
+
 from common.utils import get_logger, get_object_or_none
 from .models import AdHocTask, AdHocContent
 
@@ -66,4 +72,20 @@ def update_or_create_adhoc_task(
     return task, created
 
 
-
+def generate_ansible_module_index():
+    modules = {}
+    module_path = os.path.join(ansible.__path__[0], 'modules')
+    for catalog in os.listdir(module_path):
+        if not os.path.isdir(os.path.join(module_path, catalog)):
+            continue
+        modules[catalog] = {}
+        catalog_path = os.path.join(module_path, catalog)
+        for module_file in os.listdir(catalog_path):
+            if module_file == '__init__.py' or not module_file.endswith('.py'):
+                continue
+            module_name = module_file.replace('.py', '', 1)
+            module = importlib.import_module('ansible.modules.{}.{}'.format(catalog, module_name))
+            document = yaml.load(getattr(module, 'DOCUMENTATION'))
+            modules[catalog][module_name] = document
+            del module_name
+    return modules

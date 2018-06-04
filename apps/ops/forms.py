@@ -4,7 +4,7 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _
 
 from common.forms_base import CombineModelForm
-from .models import AuthChangeTask, AuthChangeContent
+from .models import AuthChangeTask, AuthChangeContent, Job
 
 
 class AuthChangeTaskForm(forms.ModelForm):
@@ -73,4 +73,7 @@ class AuthChangeTaskCreateUpdateForm(CombineModelForm):
         return task
 
 
-
+class JobCreateUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Job
+        fields = '__all__'

@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 from rest_framework import serializers
 
-from .models import AdHocTask, AdHocContent, AdHocRunHistory
+from .models import AdHocTask, AdHocContent, AdHocRunHistory, Project
 
 
 class AdHocTaskSerializer(serializers.ModelSerializer):
@@ -57,3 +57,9 @@ class AdHocRunHistorySerializer(serializers.ModelSerializer):
         fields = super().get_field_names(declared_fields, info)
         fields.extend(['summary', 'short_id'])
         return fields
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = '__all__'
