@@ -114,8 +114,7 @@ class LDAPSettingForm(BaseForm):
         widget=forms.PasswordInput, required=False
     )
     AUTH_LDAP_SEARCH_OU = forms.CharField(
-        label=_("User OU"), initial='ou=tech,dc=jumpserver,dc=org',
-        help_text=_("Use | split User OUs")
+        label=_("User OU"), initial='ou=tech,dc=jumpserver,dc=org'
     )
     AUTH_LDAP_SEARCH_FILTER = forms.CharField(
         label=_("User search filter"), initial='(cn=%(user)s)',
