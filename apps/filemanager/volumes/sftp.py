@@ -6,6 +6,7 @@ import paramiko
 import traceback
 import stat
 import hashlib
+import base64
 
 from django.utils.six import BytesIO
 from urllib.parse import urlparse
@@ -18,28 +19,22 @@ logger = get_logger(__file__)
 
 
 class SFTPVolume(BaseVolume):
-
-    def __init__(self, host=None, port=22, username='root',
-                 password=None, pkey=None, base_path='/'):
+    def __init__(self, host='127.0.0.1', port=22, username='root',
+                 password=None, pkey=None):
         self.host = host
         self.port = port
         self.username = username
         self.password = password
         self.pkey = pkey
-        self.base_path = base_path
-        self._dir_mode = '0o755'
-        self._file_mode = '0o644'
         self._ssh = None
+        self.root_name = 'Home'
         super().__init__()
-
-    def get_volume_id(self):
-        return 'fc%s' % '123'
 
     def _connect(self):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self._ssh.connect('192.168.244.140', username='root', password='redhat')
+            self._ssh.connect('192.168.244.177', username='root', password='redhat123')
             # self._ssh.connect(self.host, port=self.port, username=self.username,
             #                   password=self.password, pkey=self.pkey, timeout=30)
         except paramiko.AuthenticationException as e:
@@ -58,32 +53,42 @@ class SFTPVolume(BaseVolume):
             self._connect()
         return self._sftp
 
-    def stat(self, target):
-        path = self._remote_path(target)
-        attr = self.sftp.stat(path)
+    def get_volume_id(self):
+        _id = '{}@{}@{}'.format(self.host, self.port, self.username)
+        return _id
+
+    def get_info(self, target):
+        remote_path = self._remote_path(target)
+        attr = self.sftp.stat(remote_path)
+        if target in ['', '/']:
+            attr.filename = self.root_name
+        return self._get_stat_info(attr, remote_path)
+
+    def _get_stat_info(self, attr, target):
         data = {
-            "name": target,
-            "hash": self.__hash(path),
+            "name": attr.filename,
+            "hash": self.get_hash(target),
             "mime": "directory" if stat.S_ISDIR(attr.st_mode) else "file",
             "read": 1,
             "write": 1,
-            "size": 0,
+            "size": "unknown",
         }
         return data
 
-    def get_tree(self, target, ancestors=False, siblings=False):
-        tree = []
-        remote_path = self._remote_path(target)
-        dirs, files, types = self.list(remote_path)
+    def list(self, _hash):
+        print("list: {}".format(_hash))
+        files = []
+        remote_path = self.get_path_by_hash(_hash)
+        attrs = self.sftp.listdir_attr(remote_path)
+        for attr in attrs:
+            item_path = os.path.join(remote_path, attr.filename)
+            info = self._get_stat_info(attr, item_path)
+            files.append(info)
+        return files
 
-
-
-
-    def __hash(self, path):
-        """Hash of the path"""
-        m = hashlib.md5()
-        m.update(path)
-        return str(m.hexdigest())
+    def get_tree(self, target):
+        print("get tree: {}".format(target))
+        return self.list(target)
 
     def _join(self, *args):
         # Use the path module for the remote host type to join a path together

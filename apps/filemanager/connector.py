@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ElFinderConnector:
-    _version = '2.1'
+    _version = '2.0'
 
     supported_commands = {
         'open': ('__open', {'target': True}),
@@ -79,14 +79,12 @@ class ElFinderConnector:
             'type', 'width', 'height', 'upload[]'
         ]
 
-
-
-    def get_volume(self, hash):
+    def get_volume(self, _hash):
         """ Returns the volume which contains the file/dir represented by the
             hash.
         """
         try:
-            volume_id, target = hash.split('_')
+            volume_id, target = _hash.split('_')[0:2]
         except ValueError:
             raise Exception('Invalid target hash: %s' % hash)
         return self.volumes[volume_id]
@@ -153,12 +151,6 @@ class ElFinderConnector:
         else:
             return None, None
 
-    def is_init(self):
-        if 'init' in self.get_request_data():
-            return True
-        else:
-            return False
-
     def run(self, request):
         """ Main entry point for running commands. Attemps to run a command
             function based on info in request.GET.
@@ -172,8 +164,6 @@ class ElFinderConnector:
         """
         self.request = request
         func_name, args = self.get_request_commands()
-        print(func_name)
-        print(args)
         if not func_name:
             self.response['error'] = 'No command specified'
         else:
@@ -255,17 +245,14 @@ class ElFinderConnector:
             # Add relevant tree information for each volume
             for volume_id in self.volumes:
                 volume = self.volumes[volume_id]
-                self.response['files'] = volume.get_tree('',
-                                                         inc_ancestors,
-                                                         inc_siblings)
+                self.response['files'] = volume.get_tree('')
+
         else:
             # A target was specified, so we only need to return info about
             # that directory.
             volume = self.get_volume(target)
             self.response['cwd'] = volume.stat(target)
-            self.response['files'] = volume.get_tree(target,
-                                                     inc_ancestors,
-                                                     inc_siblings)
+            self.response['files'] = volume.get_tree(target)
 
         # If the request includes 'init', add some client initialisation
         # data to the response.
