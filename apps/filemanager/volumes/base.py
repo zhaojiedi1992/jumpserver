@@ -1,6 +1,11 @@
 import base64
 import os
 import hashlib
+import logging
+import traceback
+import sys
+
+logger = logging.getLogger(__name__)
 
 
 class BaseVolume:
@@ -74,8 +79,6 @@ class BaseVolume:
 
     @staticmethod
     def decode(_hash):
-        print("Decode")
-        print(_hash)
         _hash = _hash.translate(str.maketrans('-_.', '+=/'))
         if isinstance(_hash, str):
             _hash = _hash.encode()

@@ -1,23 +1,16 @@
-from django.core.exceptions import ObjectDoesNotExist
 import logging
-import traceback
-import sys
-from .models import FileCollection, Directory, File
-
-
-""" Connector class for Django/elFinder integration.
-
-    Permissions checks when viewing/modifying objects - users can currently
-    create files in other people's file collections, or delete files they
-    do not own. This needs to be implemented in an extendable way, rather
-    than being tied to one method of permissions checking.
-"""
-
 
 logger = logging.getLogger(__name__)
 
 
 class ElFinderConnector:
+    """ Connector class for Django/elFinder integration.
+
+        Permissions checks when viewing/modifying objects - users can currently
+        create files in other people's file collections, or delete files they
+        do not own. This needs to be implemented in an extendable way, rather
+        than being tied to one method of permissions checking.
+    """
     _version = '2.0'
 
     supported_commands = {
@@ -56,7 +49,7 @@ class ElFinderConnector:
             command.
         """
         return {
-            'api': '2.0',
+            'api': '2.1',
             'uplMaxSize': '128M',
             'options': {
                 'separator': '/',
@@ -83,8 +76,6 @@ class ElFinderConnector:
         """ Returns the volume which contains the file/dir represented by the
             hash.
         """
-        print(_hash)
-        print(self.volumes)
         try:
             volume_id, target = _hash.split('_', 1)
         except ValueError:
@@ -120,6 +111,8 @@ class ElFinderConnector:
             return
 
         func = getattr(self, '_' + self.__class__.__name__ + func_name, None)
+        print("Run command")
+        print(func_name)
         if not callable(func):
             self.response['error'] = 'Command failed'
             return
@@ -246,10 +239,11 @@ class ElFinderConnector:
             for volume_id in self.volumes:
                 volume = self.volumes[volume_id]
                 self.response['files'] = volume.get_tree('')
-
+            print("No target")
         else:
             # A target was specified, so we only need to return info about
             # that directory.
+            print("Get target")
             volume = self.get_volume(target)
             self.response['cwd'] = volume.get_info(target)
             self.response['files'] = volume.get_tree(target)

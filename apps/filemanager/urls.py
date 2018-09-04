@@ -5,6 +5,6 @@ from . import views
 app_name = 'filemanager'
 
 urlpatterns = [
-    path('model/<int:coll_id>/', views.ModelFileManagerView.as_view(), name='model-view'),
-    path('model/connector/<int:coll_id>/', views.ModelVolumeConnectorView.as_view(), name='model-volume-connector'),
+    path('model/<int:coll_id>/', views.SFTPManagerView.as_view(), name='model-view'),
+    path('model/connector/<int:coll_id>/', views.SFTPConnectorView.as_view(), name='model-volume-connector'),
 ]
