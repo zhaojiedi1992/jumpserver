@@ -13,19 +13,11 @@ from .models import FileCollection
 class ModelFileManagerView(TemplateView):
     template_name = 'filemanager/model_file_manager.html'
 
-    # def get_context_data(self, **kwargs):
-    #     coll_id = self.kwargs.get('coll_id')
-    #     context = super().get_context_data(**kwargs)
-    #     collection = FileCollection.objects.get(pk=coll_id)
-    #     context.update({
-    #         'coll_id':  collection.id,
-    #     })
-    #     return context
-
 
 class ModelVolumeConnectorView(View):
     def get(self, request, *args, **kwargs):
         volume = SFTPVolume()
+        # volume = SFTPVolume.get_volume(request)
         # model_volume = ModelVolume(**data)
         finder = ElFinderConnector([volume])
         finder.run(request)

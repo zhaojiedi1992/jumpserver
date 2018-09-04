@@ -1,4 +1,6 @@
 import base64
+import os
+import hashlib
 
 
 class BaseVolume:
@@ -6,6 +8,10 @@ class BaseVolume:
         self.base_path = '/'
         self.dir_mode = '0o755'
         self.file_mode = '0o644'
+
+    @classmethod
+    def get_volume(cls, request):
+        raise NotImplementedError
 
     def get_volume_id(self):
         """ Returns the volume ID for the volume, which is used as a prefix
@@ -35,6 +41,12 @@ class BaseVolume:
             return ''
         return path
 
+    def get_remote_path_by_hash(self, _hash):
+        path = self.get_path_by_hash(_hash)
+        if self.base_path:
+            return os.path.join(self.base_path, path)
+        return path
+
     def get_hash(self, path):
         """
         通过path生成hash
@@ -42,39 +54,33 @@ class BaseVolume:
         :return:
         """
         _hash = "{}_{}".format(
-            self.encode(self.get_volume_id()),
+            self.get_volume_id(),
             self.encode(path)
         )
         return _hash
 
     @classmethod
     def get_volume_id_and_path(cls, _hash):
-        _volume_id, _path = _hash.split('_', 1)
-        return cls.decode(_volume_id), cls.decode(_path)
+        volume_id, _path = _hash.split('_', 1)
+        return volume_id, cls.decode(_path)
 
     @staticmethod
     def encode(content):
         if isinstance(content, str):
             content = content.encode()
-        return base64.b64encode(content).decode()
+        _hash = base64.b64encode(content).decode()
+        _hash = _hash.translate(str.maketrans('+=/', '-_.'))
+        return _hash
 
     @staticmethod
     def decode(_hash):
+        print("Decode")
+        print(_hash)
+        _hash = _hash.translate(str.maketrans('-_.', '+=/'))
         if isinstance(_hash, str):
             _hash = _hash.encode()
-        return base64.b64decode(_hash).decode()
-
-    # def get_tree(self, target, ancestors=False, siblings=False):
-    #     """ Gets a list of dicts describing children/ancestors/siblings of the
-    #         target.
-    #
-    #         :param target: The hash of the directory the tree starts from.
-    #         :param ancestors: Include ancestors of the target.
-    #         :param siblings: Include siblings of the target.
-    #         :param children: Include children of the target.
-    #         :returns: list -- a list of dicts describing directories.
-    #     """
-    #     raise NotImplementedError
+        _hash = base64.b64decode(_hash).decode()
+        return _hash
 
     def get_tree(self, target):
         raise NotImplementedError
@@ -162,3 +168,8 @@ class BaseVolume:
             new files.
             :returns: TODO
         """
+
+    def _hash(self, s):
+        m = hashlib.md5()
+        m.update(s.encode())
+        return str(m.hexdigest())

@@ -83,8 +83,10 @@ class ElFinderConnector:
         """ Returns the volume which contains the file/dir represented by the
             hash.
         """
+        print(_hash)
+        print(self.volumes)
         try:
-            volume_id, target = _hash.split('_')[0:2]
+            volume_id, target = _hash.split('_', 1)
         except ValueError:
             raise Exception('Invalid target hash: %s' % hash)
         return self.volumes[volume_id]
@@ -182,9 +184,7 @@ class ElFinderConnector:
         """
         target = self.data['target']
         volume = self.get_volume(target)
-        self.response['tree'] = volume.get_tree(target,
-                                                ancestors=True,
-                                                siblings=True)
+        self.response['tree'] = volume.get_tree(target)
 
     def __tree(self):
         """ Handles the 'tree' command.
@@ -240,7 +240,7 @@ class ElFinderConnector:
 
             # Assume the first volume's root is the currently open directory.
             volume = list(self.volumes.values())[0]
-            self.response['cwd'] = volume.stat('')
+            self.response['cwd'] = volume.get_info('')
 
             # Add relevant tree information for each volume
             for volume_id in self.volumes:
@@ -251,7 +251,7 @@ class ElFinderConnector:
             # A target was specified, so we only need to return info about
             # that directory.
             volume = self.get_volume(target)
-            self.response['cwd'] = volume.stat(target)
+            self.response['cwd'] = volume.get_info(target)
             self.response['files'] = volume.get_tree(target)
 
         # If the request includes 'init', add some client initialisation
