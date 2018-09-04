@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
-#
-import os
-from datetime import datetime
+import logging
 import paramiko
 import traceback
 import stat
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.shortcuts import render_to_response
+from django.template import RequestContext
+import os
 
-from django.utils.six import BytesIO
-from urllib.parse import urlparse
-from django.core.files.base import File
-
-from common.utils import get_logger
 from .base import BaseVolume
+from .. import models
 
-logger = get_logger(__file__)
+
+logger = logging.getLogger(__name__)
 
 
 class SFTPVolume(BaseVolume):
@@ -33,7 +31,8 @@ class SFTPVolume(BaseVolume):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self._ssh.connect('192.168.244.177', username='root', password='redhat123')
+            self._ssh.connect('192.168.244.140', username='root',
+                              password='redhat')
             # self._ssh.connect(self.host, port=self.port, username=self.username,
             #                   password=self.password, pkey=self.pkey, timeout=30)
         except paramiko.AuthenticationException as e:
@@ -99,14 +98,14 @@ class SFTPVolume(BaseVolume):
             data['name'] = self.root_name
         return data
 
-    def get_tree(self, target):
+    def _get_list(self, target):
         print("list: {}".format(target))
         files = []
-        if target == '':
+        if target in ['', '/']:
             remote_path = os.path.join(self.base_path, '/')
-            files.append(self.get_info(''))
         else:
             remote_path = self.get_remote_path_by_hash(target)
+
         attrs = self.sftp.listdir_attr(remote_path)
         for attr in attrs:
             item_path = os.path.join(remote_path, attr.filename)
@@ -114,153 +113,151 @@ class SFTPVolume(BaseVolume):
             files.append(info)
         return files
 
-    def _join(self, *args):
-        # Use the path module for the remote host type to join a path together
-        return os.path.join(*args)
+    def get_tree(self, target, ancestors=False, siblings=False):
+        """ Returns a list of dicts describing children/ancestors/siblings of
+            the target directory.
 
-    def _remote_path(self, name):
-        return self._join(self.base_path, name)
+            Siblings of the root node are always excluded, as they refer to
+            root directories of other file collections.
+        """
+        print("Get tree")
+        tree = []
+        files = self._get_list(target)
+        tree += files
 
-    def _open(self, name, mode='rb'):
-        return SFTPStorageFile(name, self, mode)
-
-    def _read(self, name):
-        remote_path = self._remote_path(name)
-        return self.sftp.open(remote_path, 'rb')
-
-    def _chown(self, path, uid=None, gid=None):
-        """Set uid and/or gid for file at path."""
-        # Paramiko's chown requires both uid and gid, so look them up first if
-        # we're only supposed to set one.
-        if uid is None or gid is None:
-            attr = self.sftp.stat(path)
-            uid = uid or attr.st_uid
-            gid = gid or attr.st_gid
-        self.sftp.chown(path, uid, gid)
-
-    def _mkdir(self, path):
-        """Create directory, recursing up to create parent dirs if
-        necessary."""
-        parent = os.path.dirname(path)
-        if not self.exists(parent):
-            self._mkdir(parent)
-        self.sftp.mkdir(path)
-
-        if self._dir_mode is not None:
-            self.sftp.chmod(path, self._dir_mode)
-
-        # if self._uid or self._gid:
-        #     self._chown(path, uid=self._uid, gid=self._gid)
-
-    def _save(self, name, content, **kwargs):
-        """Save file via SFTP."""
-        content.open()
-        path = self._remote_path(name)
-        dirname = os.path.dirname(path)
-        if not self.exists(dirname):
-            self._mkdir(dirname)
-        if 'mode' in kwargs and 'a' in kwargs['mode']:
-            f = self.sftp.open(path, 'ab')
-        else:
-            f = self.sftp.open(path, 'wb')
-        f.write(content.file.read())
-        f.close()
-
-        # set file permissions if configured
-        if self._file_mode is not None:
-            self.sftp.chmod(path, self._file_mode)
-        return name
-
-    def delete(self, name):
-        remote_path = self._remote_path(name)
-        self.sftp.remove(remote_path)
-
-    def delete_dir(self, name):
-        remote_path = self._remote_path(name)
-        self.sftp.rmdir(remote_path)
-
-    def exists(self, name):
-        # Try to retrieve file info.  Return true on success, false on failure.
-        remote_path = self._remote_path(name)
-
-        try:
-            self.sftp.stat(remote_path)
-            return True
-        except IOError:
-            return False
-
-    def _isdir_attr(self, item):
-        # Return whether an item in sftp.listdir_attr results is a directory
-        if item.st_mode is not None:
-            return stat.S_IFMT(item.st_mode) == stat.S_IFDIR
-        else:
-            return False
-
-    def listdir(self, path):
-        remote_path = self._remote_path(path)
-        dirs, files, files_type = [], [], {}
-        for item in self.sftp.listdir_attr(remote_path):
-            if self._isdir_attr(item):
-                dirs.append(item.filename)
+        # Add ancestors next, if required
+        if ancestors:
+            tree.append(self.get_info(target))
+            if target in ['', '/']:
+                remote_path = os.path.join(self.base_path, '/')
+                return tree
             else:
-                files.append(item.filename)
-                files_type[item.filename] = str(item)[0:1]
-        return dirs, files, files_type
+                remote_path = self.get_remote_path_by_hash(target)
+            paths = remote_path.split('/')
+            for i in range(len(paths)):
+                paths.pop()
+                ancestor_path = '/'.join(paths)
+                if ancestor_path == self.base_path:
+                    break
+                files = self._get_list(self.get_hash(ancestor_path))
+                for f in files:
+                    if f['mime'] == 'directory':
+                        tree.append(f)
+        return tree
 
-    def size(self, name):
-        remote_path = self._remote_path(name)
-        return self.sftp.stat(remote_path).st_size
+    def _create_object(self, name, parent_hash, model):
+        """ Helper function to create objects (files/directories).
+        """
 
-    def accessed_time(self, name):
-        remote_path = self._remote_path(name)
-        utime = self.sftp.stat(remote_path).st_atime
-        return datetime.fromtimestamp(utime)
+        parent = self.get_object(parent_hash)
 
-    def modified_time(self, name):
-        remote_path = self._remote_path(name)
-        utime = self.sftp.stat(remote_path).st_mtime
-        return datetime.fromtimestamp(utime)
+        new_obj = model(name=name,
+                        parent=parent,
+                        collection=self.collection)
+        try:
+            new_obj.validate_unique()
+        except ValidationError as e:
+            logger.exception(e)
+            raise Exception("\n".join(e.messages))
 
-    def url(self, name):
-        if self._base_url is None:
-            raise ValueError("This file is not accessible via a URL.")
-        return urlparse.urljoin(self._base_url, name).replace('\\', '/')
+        new_obj.save()
+        return new_obj.get_info()
 
+    def read_file_view(self, request, hash):
+        file = self.get_object(hash)
+        return render_to_response('filemanager/read_file.html',
+                                  {'file': file},
+                                  RequestContext(request))
 
-class SFTPStorageFile(File):
-    def __init__(self, name, storage, mode):
-        self._name = name
-        self._storage = storage
-        self._mode = mode
-        self._is_dirty = False
-        self.file = BytesIO()
-        self._is_read = False
+    def mkdir(self, name, parent):
+        """ Creates a new directory. """
+        return self._create_object(name, parent, self.directory_model)
 
-    @property
-    def name(self):
-        return self._name
+    def mkfile(self, name, parent):
+        """ Creates a new file. """
+        return self._create_object(name, parent, self.file_model)
 
-    @property
-    def size(self):
-        if not hasattr(self, '_size'):
-            self._size = self._storage.size(self._name)
-        return self._size
+    def rename(self, name, target):
+        """ Renames a file or directory. """
+        object = self.get_object(target)
+        object.name = name
+        object.save()
+        return {'added': [object.get_info()],
+                'removed': [target]}
 
-    def read(self, num_bytes=None):
-        if not self._is_read:
-            self.file = self._storage._read(self._name)
-            self._is_read = True
+    def list(self, target):
+        """ Returns a list of files/directories in the target directory. """
+        list = []
+        for object in self.get_tree(target):
+            list.append(object['name'])
+        return list
 
-        return self.file.read(num_bytes)
+    def paste(self, targets, source, dest, cut):
+        """ Moves/copies target files/directories from source to dest. """
+        source_dir = self.get_object(source)
+        dest_dir = self.get_object(dest)
+        added = []
+        removed = []
+        for target in targets:
+            object = self.get_object(target)
+            object.parent = dest_dir
+            if not cut:
+                # This is a copy so the original object should not be changed.
+                # Setting the id to None causes Django to insert a new model
+                # instead of updating the existing one.
+                object.id = None
 
-    def write(self, content):
-        if 'w' not in self._mode and 'a' not in self._mode:
-            raise AttributeError("File was opened for read-only access.")
-        self.file = BytesIO(content)
-        self._is_dirty = True
-        self._is_read = True
+            # If an object with the same name already exists in the target
+            # directory, it should be deleted. This needs to be done for
+            # both Files and Directories. Using filter() and iterating
+            # over the results is a bit cleaner than using get() and checking
+            # if an object was returned, even though most of the time both
+            # querysets will be empty.
+            dirs = self.directory_model.objects.filter(name=object.name,
+                                                   parent=object.parent)
+            files = self.file_model.objects.filter(name=object.name,
+                                                  parent=object.parent)
+            for dir in dirs:
+                removed.append(dir.get_hash())
+                dir.delete()
+            for file in files:
+                removed.append(file.get_hash())
+                file.delete()
 
-    def close(self):
-        if self._is_dirty:
-            self._storage._save(self._name, self, mode=self._mode)
-        self.file.close()
+            object.save()
+            added.append(object.get_info())
+            if cut:
+                removed.append(object.get_info()['hash'])
+
+        return {'added': added,
+                'removed': removed}
+
+    def remove(self, target):
+        """ Delete a File or Directory object. """
+        object = self.get_object(target)
+        object.delete()
+        return target
+
+    def upload(self, files, parent):
+        """ For now, this uses a very naive way of storing files - the entire
+            file is read in to the File model's content field in one go.
+
+            This should be updated to use read_chunks to add the file one 
+            chunk at a time.
+        """
+        added = []
+        parent = self.get_object(parent)
+        for upload in files.getlist('upload[]'):
+            new_file = self.file_model(name=upload.name,
+                                       parent=parent,
+                                       collection=self.collection,
+                                       content=upload.read())
+            try:
+                new_file.validate_unique()
+            except ValidationError as e:
+                logger.exception(e)
+                raise Exception("\n".join(e.messages))
+
+            new_file.save()
+            added.append(new_file.get_info())
+        return {'added': added}

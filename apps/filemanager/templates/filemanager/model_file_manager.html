@@ -18,24 +18,24 @@
             placesFirst : false,
             requestType: 'get',
             customData : {csrfmiddlewaretoken : '{{ csrf_token }}'},
-            {#uiOptions : {toolbar: [#}
-            {#                ['back', 'forward'],#}
-            {#                ['mkdir', 'mkfile'],#}
-            {#                ['copy', 'cut', 'paste'],#}
-            {#                ['rm'],#}
-            {#                ['rename'],#}
-            {#                ['view']#}
-            {#               ]#}
-            {#            },#}
-            {#contextmenu : {navbar : ['open', '|', 'copy', 'cut', 'paste', '|',#}
-            {#                          'rm'],#}
-            {#                cwd : ['reload', 'back', '|',#}
-            {#                       'mkdir', 'mkfile', 'paste', '|',#}
-            {#                       'upload'],#}
-            {#                files : ['edit', 'open', '|',#}
-            {#                         'copy', 'cut', 'paste', '|',#}
-            {#                         'rm', 'rename']#}
-            {#              }#}
+            uiOptions : {toolbar: [
+                            ['back', 'forward'],
+                            ['mkdir', 'mkfile'],
+                            ['copy', 'cut', 'paste'],
+                            ['rm'],
+                            ['rename'],
+                            ['view']
+                           ]
+                        },
+            contextmenu : {navbar : ['open', '|', 'copy', 'cut', 'paste', '|',
+                                      'rm'],
+                            cwd : ['reload', 'back', '|',
+                                   'mkdir', 'mkfile', 'paste', '|',
+                                   'upload'],
+                            files : ['edit', 'open', '|',
+                                     'copy', 'cut', 'paste', '|',
+                                     'rm', 'rename']
+                          }
         }).elfinder('instance');            
         });
     </script>

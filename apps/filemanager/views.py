@@ -5,7 +5,7 @@ from django.views.generic import TemplateView, DetailView, View
 from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
 
-from .volumes import SFTPVolume
+from .volumes import SFTPVolume, ModelVolume
 from .connector import ElFinderConnector
 from .models import FileCollection
 
@@ -16,9 +16,9 @@ class SFTPManagerView(TemplateView):
 
 class SFTPConnectorView(View):
     def get(self, request, *args, **kwargs):
+        coll_id = self.kwargs.get('coll_id')
         volume = SFTPVolume()
-        # volume = SFTPVolume.get_volume(request)
-        # model_volume = ModelVolume(**data)
+        # volume = ModelVolume(coll_id=coll_id)
         finder = ElFinderConnector([volume])
         finder.run(request)
 
