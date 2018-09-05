@@ -1,6 +1,6 @@
 {% load static %}
 <html>
-  <body>
+  <body style="margin: 0">
     {% block includes %}
     <script type="text/javascript" src="{% static 'js/jquery-2.1.1.js' %}" ></script>
     <script type="text/javascript" src="{% static 'js/jquery-ui-1.10.4.min.js' %}"></script>
@@ -15,9 +15,10 @@
         var elf = $('#elfinder').elfinder({
             cssAutoLoad: ['{% static 'css/plugins/elfinder/css/theme-gray.min.css' %}'],
             url : '{% url 'filemanager:model-volume-connector' coll_id=coll_id %}',
-            places : 'h',
             rememberLastDir : false,
+            height : $(window).height(),
             placesFirst : false,
+            resizable: false,
             requestType: 'get',
             customData : {csrfmiddlewaretoken : '{{ csrf_token }}'},
             uiOptions : {
@@ -43,12 +44,21 @@
                 ]
             }
         }).elfinder('instance');
+        var resizeTimer;
+        $(window).resize(function() {
+            resizeTimer && clearTimeout(resizeTimer);
+            if (! $('#elfinder').hasClass('elfinder-fullscreen')) {
+                resizeTimer = setTimeout(function() {
+                    var h = parseInt($(window).height());
+                    if (h != parseInt($('#elfinder').height())) {
+                        elf.resize('100%', h);
+                    }
+                }, 200);
+            }
+        });
         });
     </script>
     {% endblock elfinder_init %}
-
-    {% block elfinder_div %}
-    <div id="elfinder"></div>
-    {% endblock elfinder_div %}
+    <div id="elfinder" ></div>
   </body>
 </html>
