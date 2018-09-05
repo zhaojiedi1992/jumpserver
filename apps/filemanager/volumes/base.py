@@ -88,6 +88,18 @@ class BaseVolume:
     def get_tree(self, target):
         raise NotImplementedError
 
+    def _base_name(self, remote_path):
+        return os.path.basename(remote_path)
+
+    def _parent_path(self, remote_path):
+        if remote_path != '/':
+            remote_path = remote_path.rstrip('/')
+        parent_path = os.path.dirname(remote_path)
+        return parent_path
+
+    def _join(self, *args):
+        return os.path.join(*args)
+
     def read_file_view(self, request, hash):
         """ Django view function, used to display files in response to the
             'file' command.

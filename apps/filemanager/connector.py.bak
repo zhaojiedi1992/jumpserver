@@ -36,7 +36,7 @@ class ElFinderConnector:
     ]
 
     _options = {
-        'api': '2.1',
+        'api': '2.0',
         'uplMaxSize': '128M',
         'options': {
             'separator': '/',

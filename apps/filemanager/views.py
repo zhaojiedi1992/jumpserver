@@ -1,22 +1,20 @@
 import json
 from django.http import HttpResponse
-from django.shortcuts import render_to_response, render
-from django.views.generic import TemplateView, DetailView, View
+from django.shortcuts import render_to_response
+from django.views.generic import TemplateView, View
 from django.template import RequestContext
-from django.views.decorators.csrf import csrf_exempt
 
 from .volumes import SFTPVolume, ModelVolume
 from .connector import ElFinderConnector
-from .models import FileCollection
 
 
 class SFTPManagerView(TemplateView):
-    template_name = 'filemanager/model_file_manager.html'
+    template_name = 'filemanager/file_manager.html'
 
 
 class SFTPConnectorView(View):
     def get(self, request, *args, **kwargs):
-        coll_id = self.kwargs.get('coll_id')
+        # coll_id = self.kwargs.get('coll_id')
         volume = SFTPVolume()
         # volume = ModelVolume(coll_id=coll_id)
         finder = ElFinderConnector([volume])
@@ -25,6 +23,7 @@ class SFTPConnectorView(View):
         # Some commands (e.g. read file) will return a Django View - if it
         # is set, return it directly instead of building a response
         if finder.return_view:
+            print(finder.return_view)
             return finder.return_view
 
         response = HttpResponse(content_type=finder.httpHeader['Content-type'])
