@@ -18,7 +18,7 @@ class ElFinderConnector:
         'tree': ('__tree', {'target': True}),
         'file': ('__file', {'target': True}),
         'parents': ('__parents', {'target': True}),
-        'mkdir': ('__mkdir', {'target': True, 'name': False, 'dirs[]': False}),
+        'mkdir': ('__mkdir', {'target': True}),
         'mkfile': ('__mkfile', {'target': True, 'name': True}),
         'rename': ('__rename', {'target': True, 'name': True}),
         'ls': ('__list', {'target': True}),
@@ -51,11 +51,11 @@ class ElFinderConnector:
     }
 
     def __init__(self, volumes=None):
-        self.httpResponse = {}
-        self.httpStatusCode = 200
-        self.httpHeader = {'Content-type': 'application/json'}
-        self.data = {}
         self.response = {}
+        self.status_code = 200
+        self.headers = {'Content-type': 'application/json'}
+
+        self.data = {}
         self.return_view = None
         self.volumes = {}
         self.request = None
@@ -108,7 +108,7 @@ class ElFinderConnector:
             func()
         except Exception as e:
             self.response['error'] = '%s' % e
-            logger.info(e)
+            logger.exception(e)
 
     def get_request_data(self):
         data_source = {}
@@ -150,7 +150,6 @@ class ElFinderConnector:
             self.response['error'] = 'No command specified'
         else:
             self.run_command(func_name, args)
-        self.httpResponse = self.response
 
     def __parents(self):
         """ Handles the parent command.
@@ -164,7 +163,7 @@ class ElFinderConnector:
         """
         target = self.data['target']
         volume = self.get_volume(target)
-        self.response['tree'] = volume.get_tree(target)
+        self.response['tree'] = volume.parents(target)
 
     def __tree(self):
         """ Handles the 'tree' command.
@@ -174,7 +173,7 @@ class ElFinderConnector:
         """
         target = self.data['target']
         volume = self.get_volume(target)
-        self.response['tree'] = volume.get_tree(target)
+        self.response['tree'] = volume.tree(target)
 
     def __file(self):
         """ Handles the 'file' command.
@@ -207,31 +206,16 @@ class ElFinderConnector:
             volume is considered to be the current directory.
         """
         target = self.data['target']
-        if 'tree' in self.data and self.data['tree'] == '1':
-            ancestors = True
-        else:
-            ancestors = False
         if target == '':
-            # No target was specified, which means the client is being opened
-            # for the first time and requires information about all currently
-            # opened volumes.
-
-            # Assume the first volume's root is the currently open directory.
             volume = list(self.volumes.values())[0]
-            self.response['cwd'] = volume.get_info('')
-
-            # Add relevant tree information for each volume
-            for volume_id in self.volumes:
-                volume = self.volumes[volume_id]
-                self.response['files'] = volume.get_tree('', ancestors=ancestors)
+            target = volume._hash('/')
         else:
-            # A target was specified, so we only need to return info about
-            # that directory.
             volume = self.get_volume(target)
-            self.response['cwd'] = volume.get_info(target)
-            self.response['files'] = volume.get_tree(target, ancestors=ancestors)
-        # If the request includes 'init', add some client initialisation
-        # data to the response.
+        self.response['cwd'] = volume.info(target)
+        files = volume.get_list(target)
+        if 'tree' in self.data:
+            files += volume.parents(target)
+        self.response['files'] = files
         if 'init' in self.data:
             self.response.update(self._options)
 

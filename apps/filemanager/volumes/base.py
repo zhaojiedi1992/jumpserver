@@ -2,8 +2,6 @@ import base64
 import os
 import hashlib
 import logging
-import traceback
-import sys
 
 logger = logging.getLogger(__name__)
 
@@ -11,12 +9,13 @@ logger = logging.getLogger(__name__)
 class BaseVolume:
     def __init__(self, *args, **kwargs):
         self.base_path = '/'
+        self.path_sep = '/'
         self.dir_mode = '0o755'
         self.file_mode = '0o644'
-
-    @classmethod
-    def get_volume(cls, request):
-        raise NotImplementedError
+    #
+    # @classmethod
+    # def get_volume(cls, request):
+    #     raise NotImplementedError
 
     def get_volume_id(self):
         """ Returns the volume ID for the volume, which is used as a prefix
@@ -24,35 +23,24 @@ class BaseVolume:
         """
         raise NotImplementedError
 
-    def get_info(self, target):
-        """ Returns a dict containing information about the target directory
-            or file. This data is used in response to 'open' commands to
-            populates the 'cwd' response var.
-
-            :param target: The hash of the directory for which we want info.
-            If this is '', return information about the root directory.
-            :returns: dict -- A dict describing the directory.
-        """
-        raise NotImplementedError
-
-    def get_path_by_hash(self, _hash):
+    def _get_path_from_hash(self, _hash):
         """
         通过_hash获取path
         :param _hash:
         :return:
         """
-        volume_id, path = self.get_volume_id_and_path(_hash)
+        volume_id, path = self._get_volume_id_and_path_from_hash(_hash)
         if volume_id != self.get_volume_id():
             return ''
         return path
 
-    def get_remote_path_by_hash(self, _hash):
-        path = self.get_path_by_hash(_hash)
+    def _get_remote_path_from_hash(self, _hash):
+        path = self._get_path_from_hash(_hash)
         if self.base_path:
             return os.path.join(self.base_path, path)
         return path
 
-    def get_hash(self, path):
+    def _hash(self, path):
         """
         通过path生成hash
         :param path:
@@ -60,17 +48,22 @@ class BaseVolume:
         """
         _hash = "{}_{}".format(
             self.get_volume_id(),
-            self.encode(path)
+            self._encode(path)
         )
         return _hash
 
+    def _degest(self, s):
+        m = hashlib.md5()
+        m.update(s.encode())
+        return str(m.hexdigest())
+
     @classmethod
-    def get_volume_id_and_path(cls, _hash):
+    def _get_volume_id_and_path_from_hash(cls, _hash):
         volume_id, _path = _hash.split('_', 1)
-        return volume_id, cls.decode(_path)
+        return volume_id, cls._decode(_path)
 
     @staticmethod
-    def encode(content):
+    def _encode(content):
         if isinstance(content, str):
             content = content.encode()
         _hash = base64.b64encode(content).decode()
@@ -78,15 +71,12 @@ class BaseVolume:
         return _hash
 
     @staticmethod
-    def decode(_hash):
+    def _decode(_hash):
         _hash = _hash.translate(str.maketrans('-_.', '+=/'))
         if isinstance(_hash, str):
             _hash = _hash.encode()
         _hash = base64.b64decode(_hash).decode()
         return _hash
-
-    def get_tree(self, target):
-        raise NotImplementedError
 
     def _base_name(self, remote_path):
         return os.path.basename(remote_path)
@@ -100,13 +90,24 @@ class BaseVolume:
     def _join(self, *args):
         return os.path.join(*args)
 
-    def read_file_view(self, request, hash):
+    def read_file_view(self, request, target):
         """ Django view function, used to display files in response to the
             'file' command.
 
             :param request: The original HTTP request.
-            :param hash: The hash of the target file.
+            :param target: The hash of the target file.
             :returns: dict -- a dict describing the new directory.
+        """
+        raise NotImplementedError
+
+    def info(self, target):
+        """ Returns a dict containing information about the target directory
+            or file. This data is used in response to 'open' commands to
+            populates the 'cwd' response var.
+
+            :param target: The hash of the directory for which we want info.
+            If this is '', return information about the root directory.
+            :returns: dict -- A dict describing the directory.
         """
         raise NotImplementedError
 
@@ -147,6 +148,25 @@ class BaseVolume:
         """
         raise NotImplementedError
 
+    def tree(self, target):
+        """ Get the sub directory of directory
+
+        :param target: The hash of the target directory.
+        :return: list - a list of containing the names of sub directories
+        """
+        raise NotImplementedError
+
+    def parents(self, target, deep=0):
+        """ Returns all parent folders and its sub directory on required deep
+            This command is invoked when a directory is reloaded in the client.
+            Data provided by 'parents' command should enable the correct drawing
+            of tree hierarchy directories.
+        :param target: The hash of the target directory.
+        :param deep: The deep to show
+        :return list - a list of containing parent and sub directory info
+        """
+        raise NotImplementedError
+
     def paste(self, targets, source, dest, cut):
         """ Moves/copies target files/directories from source to dest.
 
@@ -161,9 +181,9 @@ class BaseVolume:
             targets.
             :returns: dict -- a dict describing which targets were moved/copied.
         """
-        raise NotImplementedError
+        raise Exception("Not support paste")
 
-    def remove(self, target):
+    def remove(self, targets):
         """ Deletes the target files/directories.
 
             The 'rm' command takes a list of targets - this function is called
@@ -183,8 +203,9 @@ class BaseVolume:
             new files.
             :returns: TODO
         """
-
-    def _hash(self, s):
-        m = hashlib.md5()
-        m.update(s.encode())
-        return str(m.hexdigest())
+        raise NotImplementedError
+    #
+    # def _hash(self, s):
+    #     m = hashlib.md5()
+    #     m.update(s._encode())
+    #     return str(m.hexdigest())
