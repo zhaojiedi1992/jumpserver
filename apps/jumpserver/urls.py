@@ -65,6 +65,7 @@ v1_api_patterns = [
     path('audits/v1/', include('audits.urls.api_urls', namespace='api-audits')),
     path('orgs/v1/', include('orgs.urls.api_urls', namespace='api-orgs')),
     path('common/v1/', include('common.urls.api_urls', namespace='api-common')),
+#    path('hwl/v1/', include('hwl.urls.api_urls', namespace='api-hwl')),
 ]
 
 app_view_patterns = [
@@ -75,6 +76,7 @@ app_view_patterns = [
     path('ops/', include('ops.urls.view_urls', namespace='ops')),
     path('audits/', include('audits.urls.view_urls', namespace='audits')),
     path('orgs/', include('orgs.urls.views_urls', namespace='orgs')),
+    path('hwl/', include('hwl.urls.views_urls', namespace='hwl')),
 ]
 
 if settings.XPACK_ENABLED:

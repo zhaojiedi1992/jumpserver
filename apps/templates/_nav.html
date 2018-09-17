@@ -62,6 +62,18 @@
     </ul>
 </li>
 {% endif %}
+
+{% if request.user.is_superuser %}
+<li id="hwl">
+    <a>
+        <i class="fa fa-coffee" style="width: 14px"></i> <span class="nav-label">{% trans '部门中心' %}</span><span class="fa arrow"></span>
+    </a>
+    <ul class="nav nav-second-level">
+        <li id="task"><a href="{% url 'hwl:service-list' %}">{% trans '服务管理' %}</a></li>
+    </ul>
+</li>
+{% endif %}
+
 <li id="audits">
     <a>
         <i class="fa fa-history" style="width: 14px"></i> <span class="nav-label">{% trans 'Audits' %}</span><span class="fa arrow"></span>
